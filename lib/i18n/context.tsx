@@ -25,8 +25,18 @@ function applyDirection(lang: Language) {
   document.documentElement.setAttribute('lang', lang);
 }
 
-export function I18nProvider({ children }: { children: React.ReactNode }) {
-  const [locale, setLocaleState] = useState<Language>('en');
+interface I18nProviderProps {
+  children: React.ReactNode;
+  initialLocale?: Language;
+}
+
+function persistLocale(lang: Language) {
+  localStorage.setItem('locale', lang);
+  document.cookie = `locale=${lang}; Path=/; Max-Age=31536000; SameSite=Lax`;
+}
+
+export function I18nProvider({ children, initialLocale = 'en' }: I18nProviderProps) {
+  const [locale, setLocaleState] = useState<Language>(initialLocale);
 
   useEffect(() => {
     const saved = localStorage.getItem('locale') as Language | null;
@@ -34,13 +44,16 @@ export function I18nProvider({ children }: { children: React.ReactNode }) {
       // Restore the browser-only preference after hydration.
       // eslint-disable-next-line react-hooks/set-state-in-effect
       setLocaleState(saved);
+      persistLocale(saved);
       applyDirection(saved);
+    } else {
+      applyDirection(initialLocale);
     }
-  }, []);
+  }, [initialLocale]);
 
   const setLocale = (lang: Language) => {
     setLocaleState(lang);
-    localStorage.setItem('locale', lang);
+    persistLocale(lang);
     applyDirection(lang);
   };
 

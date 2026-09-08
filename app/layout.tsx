@@ -2,6 +2,8 @@ import type { Metadata } from 'next';
 import './globals.css';
 import { I18nProvider } from '@/lib/i18n/context';
 import { Toaster } from 'sonner';
+import { cookies } from 'next/headers';
+import type { Language } from '@/types';
 
 export const metadata: Metadata = {
   title: 'ClearanceIQ — KSA Customs Compliance',
@@ -16,11 +18,19 @@ export const metadata: Metadata = {
   },
 };
 
-export default function RootLayout({ children }: { children: React.ReactNode }) {
+export default async function RootLayout({ children }: { children: React.ReactNode }) {
+  const cookieLocale = (await cookies()).get('locale')?.value;
+  const locale: Language = cookieLocale === 'ar' ? 'ar' : 'en';
+
   return (
-    <html lang="en" dir="ltr" className="dark" data-scroll-behavior="smooth">
+    <html
+      lang={locale}
+      dir={locale === 'ar' ? 'rtl' : 'ltr'}
+      className="dark"
+      data-scroll-behavior="smooth"
+    >
       <body className="min-h-screen bg-[#0D1117] text-white antialiased">
-        <I18nProvider>
+        <I18nProvider initialLocale={locale}>
           {children}
           <Toaster
             position="top-right"
