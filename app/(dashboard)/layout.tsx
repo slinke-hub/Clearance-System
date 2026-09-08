@@ -1,5 +1,5 @@
 import { redirect } from 'next/navigation';
-import { createClient } from '@/lib/supabase/server';
+import { getCurrentUser } from '@/lib/auth/session';
 import { DashboardLayout } from '@/components/layout/DashboardLayout';
 
 export default async function DashboardGroupLayout({
@@ -7,34 +7,17 @@ export default async function DashboardGroupLayout({
 }: {
   children: React.ReactNode;
 }) {
-  const supabase = await createClient();
-
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
+  const user = await getCurrentUser();
 
   if (!user) {
     redirect('/login');
   }
 
-  // Fetch profile & subscription
-  const { data: profile } = await supabase
-    .from('profiles')
-    .select('full_name, role')
-    .eq('id', user.id)
-    .single();
-
-  const { data: subscription } = await supabase
-    .from('subscriptions')
-    .select('plan')
-    .eq('user_id', user.id)
-    .single();
-
   return (
     <DashboardLayout
-      userRole={profile?.role}
-      userName={profile?.full_name || user.email || undefined}
-      plan={subscription?.plan}
+      userRole={user.role}
+      userName={user.full_name || user.email}
+      plan={user.plan}
     >
       {children}
     </DashboardLayout>

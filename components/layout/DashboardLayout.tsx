@@ -51,9 +51,13 @@ export function DashboardLayout({ children, userRole, userName, plan }: Dashboar
   const [sidebarOpen, setSidebarOpen] = useState(false);
 
   const handleLogout = async () => {
-    await supabase.auth.signOut();
+    try {
+      await fetch('/api/auth/logout', { method: 'POST' });
+      await supabase.auth.signOut();
+    } catch {}
     toast.success('Signed out successfully');
     router.push('/login');
+    router.refresh();
   };
 
   const visibleNav = NAV_ITEMS.filter((item) => {

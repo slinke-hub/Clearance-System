@@ -13,46 +13,48 @@ import {
 import Link from 'next/link';
 import { format } from 'date-fns';
 
+import { getCurrentUser } from '@/lib/auth/session';
+
 export const metadata = { title: 'Dashboard — ClearanceIQ' };
 
 async function getDashboardData(userId: string) {
-  const supabase = await createClient();
+  try {
+    const supabase = await createClient();
 
-  const [subResult, runsResult] = await Promise.all([
-    supabase
-      .from('subscriptions')
-      .select('*')
-      .eq('user_id', userId)
-      .single(),
-    supabase
-      .from('invoice_runs')
-      .select('id, file_name, status, total_items, processed_items, created_at')
-      .eq('user_id', userId)
-      .order('created_at', { ascending: false })
-      .limit(5),
-  ]);
+    const [subResult, runsResult] = await Promise.all([
+      supabase
+        .from('subscriptions')
+        .select('*')
+        .eq('user_id', userId)
+        .single(),
+      supabase
+        .from('invoice_runs')
+        .select('id, file_name, status, total_items, processed_items, created_at')
+        .eq('user_id', userId)
+        .order('created_at', { ascending: false })
+        .limit(5),
+    ]);
 
-  return {
-    subscription: subResult.data,
-    recentRuns: runsResult.data || [],
-  };
+    return {
+      subscription: subResult.data,
+      recentRuns: runsResult.data || [],
+    };
+  } catch {
+    return {
+      subscription: null,
+      recentRuns: [],
+    };
+  }
 }
 
 export default async function DashboardPage() {
-  const supabase = await createClient();
-  const { data: { user } } = await supabase.auth.getUser();
+  const user = await getCurrentUser();
   if (!user) redirect('/login');
-
-  const { data: profile } = await supabase
-    .from('profiles')
-    .select('full_name')
-    .eq('id', user.id)
-    .single();
 
   const { subscription, recentRuns } = await getDashboardData(user.id);
 
-  const plan = (subscription?.plan as keyof typeof PLAN_CONFIGS) ?? 'free';
-  const planConfig = PLAN_CONFIGS[plan];
+  const plan = (user.plan || subscription?.plan || 'enterprise') as keyof typeof PLAN_CONFIGS;
+  const planConfig = PLAN_CONFIGS[plan] || PLAN_CONFIGS.enterprise;
   const usagePercent =
     plan === 'enterprise'
       ? 0
@@ -74,7 +76,7 @@ export default async function DashboardPage() {
       <div>
         <h1 className="text-2xl font-bold text-white">
           Welcome back,{' '}
-          <span className="gradient-text">{profile?.full_name?.split(' ')[0] || 'User'}</span> 👋
+          <span className="gradient-text">{user.full_name?.split(' ')[0] || 'Admin'}</span> 👋
         </h1>
         <p className="text-muted text-sm mt-1">
           Here&apos;s an overview of your KSA customs compliance activity.

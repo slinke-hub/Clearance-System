@@ -21,9 +21,15 @@ export default function LoginPage() {
     e.preventDefault();
     setLoading(true);
     try {
-      const { error } = await supabase.auth.signInWithPassword({ email, password });
-      if (error) throw error;
-      toast.success('Welcome back!');
+      const res = await fetch('/api/auth/login', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ email, password }),
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || 'Login failed');
+
+      toast.success(data.user?.role === 'admin' ? 'Welcome, Administrator!' : 'Welcome back!');
       router.push('/dashboard');
       router.refresh();
     } catch (err: unknown) {
