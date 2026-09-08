@@ -92,6 +92,11 @@ export async function POST(req: NextRequest) {
       sheetName: parsed.sheetName,
       autoMapping,
       preview: parsed.rows.slice(0, 5).map((r) => r.data),
+      items: lineItems.map((item) => ({
+        rowIndex: item.row_index,
+        itemName: item.item_name || '',
+        itemDescription: item.item_description || '',
+      })),
     });
   } catch (err: unknown) {
     console.error('Upload error:', err);

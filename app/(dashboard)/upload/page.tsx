@@ -27,6 +27,11 @@ interface UploadResult {
   totalRows: number;
   autoMapping: Partial<ColumnMapping>;
   preview: Record<string, unknown>[];
+  items: Array<{
+    rowIndex: number;
+    itemName: string;
+    itemDescription: string;
+  }>;
 }
 
 interface ClassificationRow {
@@ -112,29 +117,7 @@ export default function UploadPage() {
           }))
         : [];
 
-      // Fetch actual line items from DB for full dataset
-      const { createClient } = await import('@/lib/supabase/client');
-      const supabase = createClient();
-      const { data: lineItems } = await supabase
-        .from('invoice_line_items')
-        .select('row_index, item_name, item_description')
-        .eq('run_id', runId)
-        .order('row_index');
-
-      interface LineItemRecord {
-        row_index?: number;
-        rowIndex?: number;
-        item_name?: string | null;
-        itemName?: string;
-        item_description?: string | null;
-        itemDescription?: string;
-      }
-
-      const classifyItems = ((lineItems as LineItemRecord[] | null) || items).map((li: LineItemRecord) => ({
-        rowIndex: typeof li.row_index === 'number' ? li.row_index : (li.rowIndex ?? 0),
-        itemName: typeof li.item_name === 'string' ? li.item_name : (li.itemName ?? ''),
-        itemDescription: typeof li.item_description === 'string' ? li.item_description : (li.itemDescription ?? ''),
-      }));
+      const classifyItems = uploadResult.items?.length > 0 ? uploadResult.items : items;
 
       const res = await fetch('/api/classify', {
         method: 'POST',

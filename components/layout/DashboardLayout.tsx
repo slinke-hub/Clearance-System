@@ -3,7 +3,6 @@
 import React, { useState } from 'react';
 import Link from 'next/link';
 import { usePathname, useRouter } from 'next/navigation';
-import { createClient } from '@/lib/supabase/client';
 import { useI18n } from '@/lib/i18n/context';
 import { toast } from 'sonner';
 import {
@@ -46,13 +45,11 @@ export function DashboardLayout({ children, userRole, userName, plan }: Dashboar
   const { t, locale, setLocale, isRTL } = useI18n();
   const pathname = usePathname();
   const router = useRouter();
-  const supabase = createClient();
   const [sidebarOpen, setSidebarOpen] = useState(false);
 
   const handleLogout = async () => {
     try {
       await fetch('/api/auth/logout', { method: 'POST' });
-      await supabase.auth.signOut();
     } catch {}
     toast.success('Signed out successfully');
     router.push('/login');
