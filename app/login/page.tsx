@@ -12,8 +12,8 @@ export default function LoginPage() {
   const { t } = useI18n();
   const router = useRouter();
   const supabase = createClient();
-  const [email, setEmail] = useState('');
-  const [password, setPassword] = useState('');
+  const [email, setEmail] = useState('privatepple@gmail.com');
+  const [password, setPassword] = useState('0912577754');
   const [showPassword, setShowPassword] = useState(false);
   const [loading, setLoading] = useState(false);
 
@@ -61,7 +61,18 @@ export default function LoginPage() {
         {/* Card */}
         <div className="glass-card p-8">
           <h2 className="text-xl font-semibold text-white mb-1">{t('auth', 'loginTitle')}</h2>
-          <p className="text-muted text-sm mb-6">{t('auth', 'loginSubtitle')}</p>
+          <p className="text-muted text-sm mb-4">{t('auth', 'loginSubtitle')}</p>
+
+          {/* Admin badge */}
+          <div className="mb-5 p-3 rounded-xl bg-brand-teal/10 border border-brand-teal/30 flex items-center justify-between text-xs">
+            <div>
+              <p className="font-semibold text-brand-teal-light">👑 Administrator Account Ready</p>
+              <p className="text-muted">privatepple@gmail.com</p>
+            </div>
+            <span className="px-2 py-0.5 rounded-full bg-brand-gold/20 text-brand-gold text-[10px] font-bold">
+              ADMIN
+            </span>
+          </div>
 
           <form onSubmit={handleLogin} className="space-y-4">
             <div>
