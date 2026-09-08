@@ -1,7 +1,29 @@
 @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&family=Noto+Sans+Arabic:wght@300;400;500;600;700;800&display=swap');
 
 @import "tailwindcss";
-@config "../tailwind.config.ts";
+
+@theme {
+  --color-brand-teal: #006C67;
+  --color-brand-teal-light: #00857E;
+  --color-brand-teal-dark: #004D49;
+  --color-brand-gold: #C8962E;
+  --color-brand-gold-light: #E0B44A;
+  --color-brand-gold-dark: #A07520;
+
+  --color-surface: #1A1F2E;
+  --color-surface-raised: #1E2438;
+  --color-surface-overlay: #242A3E;
+  --color-surface-border: #2D3450;
+
+  --color-muted: #8892A4;
+  --color-success: #22C55E;
+  --color-warning: #F59E0B;
+  --color-error: #EF4444;
+  --color-info: #3B82F6;
+
+  --font-sans: var(--font-inter), 'Inter', system-ui, sans-serif;
+  --font-arabic: var(--font-noto-arabic), 'Noto Sans Arabic', system-ui, sans-serif;
+}
 
 /* ── Root CSS Variables ──────────────────────────────────────── */
 :root {
