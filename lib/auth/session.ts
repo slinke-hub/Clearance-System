@@ -1,5 +1,7 @@
 import { cookies } from 'next/headers';
 import { createClient } from '@/lib/supabase/server';
+import { isSupabaseConfigured } from '@/lib/supabase/config';
+import type { ClearanceBusinessType } from '@/types';
 
 export interface AppUser {
   id: string;
@@ -7,6 +9,7 @@ export interface AppUser {
   role: 'admin' | 'superadmin' | 'user';
   full_name: string;
   user_type: 'individual' | 'enterprise';
+  business_type?: ClearanceBusinessType;
   plan: 'free' | 'pro' | 'enterprise';
 }
 
@@ -43,8 +46,26 @@ export async function getCurrentUser(): Promise<AppUser | null> {
     } catch {}
   }
 
+  const clientCookie = cookieStore.get('clearance_client_session')?.value;
+  if (clientCookie && !isSupabaseConfigured()) {
+    try {
+      const parsed = JSON.parse(clientCookie);
+      if (typeof parsed.email === 'string' && parsed.email.includes('@')) {
+        return {
+          id: parsed.id || '00000000-0000-0000-0000-000000000002',
+          email: parsed.email,
+          role: 'user',
+          full_name: parsed.full_name || parsed.fullName || parsed.email,
+          user_type: parsed.user_type === 'individual' ? 'individual' : 'enterprise',
+          business_type: parsed.business_type,
+          plan: ['free', 'pro', 'enterprise'].includes(parsed.plan) ? parsed.plan : 'free',
+        };
+      }
+    } catch {}
+  }
+
   // Try Supabase auth
-  try {
+  if (isSupabaseConfigured()) try {
     const supabase = await createClient();
     const {
       data: { user },

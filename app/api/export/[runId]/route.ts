@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createClient } from '@/lib/supabase/server';
 import { getCurrentUser } from '@/lib/auth/session';
-import { generateEnrichedExcel } from '@/lib/excel/exporter';
+import { generateEnrichedExcel, type ExportableLineItem } from '@/lib/excel/exporter';
 import { mockStore } from '@/lib/mock/store';
 
 export async function GET(
@@ -15,7 +15,7 @@ export async function GET(
     const { runId } = await params;
 
     let fileName = 'Invoice';
-    let enrichedItems: any[] = [];
+    let enrichedItems: ExportableLineItem[] = [];
 
     // 1. Try fetching from Supabase if connected
     try {

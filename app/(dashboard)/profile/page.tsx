@@ -6,20 +6,15 @@ import { useI18n } from '@/lib/i18n/context';
 import {
   User,
   Building2,
-  Mail,
   Shield,
-  Key,
   Globe,
   Save,
   CheckCircle2,
   Lock,
-  Sparkles,
-  Phone,
-  FileCheck,
 } from 'lucide-react';
 
 export default function ProfilePage() {
-  const { t, locale, setLocale, isRTL } = useI18n();
+  const { locale, setLocale } = useI18n();
 
   const [fullName, setFullName] = useState('Admin User');
   const [email] = useState('privatepple@gmail.com');

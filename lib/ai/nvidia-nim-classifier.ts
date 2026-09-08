@@ -6,7 +6,7 @@ const client = new OpenAI({
   baseURL: process.env.NVIDIA_NIM_BASE_URL || 'https://integrate.api.nvidia.com/v1',
 });
 
-const MODEL = process.env.NVIDIA_NIM_MODEL || 'nvidia/llama-3.1-nemotron-70b-instruct';
+const MODEL = process.env.NVIDIA_NIM_MODEL || 'moonshotai/kimi-k3';
 
 const SYSTEM_PROMPT = `You are an expert KSA Customs and ZATCA (Zakat, Tax and Customs Authority) compliance classifier with deep knowledge of:
 - Saudi Arabia's Harmonized System (HS) Code taxonomy (8-12 digit GCC/KSA codes)
@@ -51,8 +51,9 @@ Return ONLY the JSON classification object.`;
       { role: 'system', content: SYSTEM_PROMPT },
       { role: 'user', content: userMessage },
     ],
-    temperature: 0.1,
-    max_tokens: 256,
+    temperature: 1,
+    reasoning_effort: 'low',
+    max_tokens: 1024,
   });
 
   const content = completion.choices[0]?.message?.content?.trim() || '';

@@ -4,16 +4,10 @@ import React, { useState } from 'react';
 import { toast } from 'sonner';
 import {
   ShieldCheck,
-  Server,
   Database,
   Cpu,
   RefreshCw,
   Sliders,
-  CheckCircle2,
-  AlertTriangle,
-  Users,
-  FileCheck,
-  Key,
   Layers,
 } from 'lucide-react';
 

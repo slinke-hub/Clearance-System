@@ -45,7 +45,7 @@ export async function POST(req: NextRequest) {
     }
 
     // Run batch classification
-    const model = process.env.NVIDIA_NIM_MODEL || 'nvidia/llama-3.1-nemotron-70b-instruct';
+    const model = process.env.NVIDIA_NIM_MODEL || 'moonshotai/kimi-k3';
     const classifications = await classifyItemsBatch(items, 5);
 
     // Update mockStore for resilient offline/dev access
@@ -55,7 +55,7 @@ export async function POST(req: NextRequest) {
         cdf: c?.cdf,
         regulation_status: c?.regulationStatus,
         standardized_name: c?.standardizedZatcaName,
-        confidence_score: c?.confidenceScore,
+        confidence_score: c?.confidenceScore ?? null,
         classified_at: new Date().toISOString(),
       });
     });

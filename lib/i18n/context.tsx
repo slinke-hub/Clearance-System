@@ -19,22 +19,24 @@ const dictionaries = { en, ar } as Record<Language, Translations>;
 
 const I18nContext = createContext<I18nContextType | null>(null);
 
+function applyDirection(lang: Language) {
+  const dir = lang === 'ar' ? 'rtl' : 'ltr';
+  document.documentElement.setAttribute('dir', dir);
+  document.documentElement.setAttribute('lang', lang);
+}
+
 export function I18nProvider({ children }: { children: React.ReactNode }) {
   const [locale, setLocaleState] = useState<Language>('en');
 
   useEffect(() => {
     const saved = localStorage.getItem('locale') as Language | null;
     if (saved === 'ar' || saved === 'en') {
+      // Restore the browser-only preference after hydration.
+      // eslint-disable-next-line react-hooks/set-state-in-effect
       setLocaleState(saved);
       applyDirection(saved);
     }
   }, []);
-
-  const applyDirection = (lang: Language) => {
-    const dir = lang === 'ar' ? 'rtl' : 'ltr';
-    document.documentElement.setAttribute('dir', dir);
-    document.documentElement.setAttribute('lang', lang);
-  };
 
   const setLocale = (lang: Language) => {
     setLocaleState(lang);

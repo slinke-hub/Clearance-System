@@ -3,7 +3,6 @@
 import React, { useState } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
-import { createClient } from '@/lib/supabase/client';
 import { useI18n } from '@/lib/i18n/context';
 import { toast } from 'sonner';
 import { Eye, EyeOff, Loader2, ShieldCheck } from 'lucide-react';
@@ -11,7 +10,6 @@ import { Eye, EyeOff, Loader2, ShieldCheck } from 'lucide-react';
 export default function LoginPage() {
   const { t } = useI18n();
   const router = useRouter();
-  const supabase = createClient();
   const [email, setEmail] = useState('privatepple@gmail.com');
   const [password, setPassword] = useState('0912577754');
   const [showPassword, setShowPassword] = useState(false);

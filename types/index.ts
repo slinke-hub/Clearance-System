@@ -11,18 +11,30 @@ export type RegulationStatus = 'REGULATED' | 'NON-REGULATED' | 'UNKNOWN';
 export type OrgMemberRole = 'owner' | 'admin' | 'member';
 export type Language = 'en' | 'ar';
 
+// ── Business Type for KSA Clearance ─────────────────────────
+export type ClearanceBusinessType = 'customs_broker' | 'importer_exporter' | 'freight_forwarder' | 'individual';
+
 // ── Profile ──────────────────────────────────────────────────
 export interface Profile {
   id: string;
   full_name: string | null;
   email: string;
   user_type: UserType;
+  business_type?: ClearanceBusinessType;
   role: UserRole;
   language_pref: Language;
   avatar_url: string | null;
   phone: string | null;
   company_name: string | null;
+  company_name_ar?: string | null;
+  cr_number?: string | null;
   vat_number: string | null;
+  broker_license_no?: string | null;
+  fasah_id?: string | null;
+  primary_port?: string | null;
+  industry_sector?: string | null;
+  transport_license_no?: string | null;
+  monthly_volume?: string | null;
   org_id: string | null;
   created_at: string;
   updated_at: string;
@@ -49,8 +61,13 @@ export interface Organization {
   slug: string;
   owner_id: string | null;
   logo_url: string | null;
+  company_name_ar?: string | null;
   vat_number: string | null;
   cr_number: string | null;
+  broker_license_no?: string | null;
+  fasah_id?: string | null;
+  primary_port?: string | null;
+  business_type?: ClearanceBusinessType | null;
   created_at: string;
   updated_at: string;
 }

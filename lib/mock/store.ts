@@ -1,3 +1,17 @@
+import type { ClassificationResult } from '@/types';
+
+type MockClassification = Partial<
+  Pick<
+    ClassificationResult,
+    | 'hs_code'
+    | 'cdf'
+    | 'regulation_status'
+    | 'standardized_name'
+    | 'confidence_score'
+    | 'classified_at'
+  >
+>;
+
 export interface MockRun {
   id: string;
   user_id: string;
@@ -19,7 +33,7 @@ export interface MockLineItem {
   unit_price?: string | null;
   total_price?: string | null;
   currency?: string | null;
-  classification?: any;
+  classification?: MockClassification;
 }
 
 // In-memory store for development/demo mode
@@ -43,7 +57,7 @@ class MemoryStore {
     return this.lineItems.get(runId) || [];
   }
 
-  updateClassification(runId: string, rowIndex: number, classification: any) {
+  updateClassification(runId: string, rowIndex: number, classification: MockClassification) {
     const items = this.lineItems.get(runId);
     if (items) {
       const item = items.find((i) => i.row_index === rowIndex);

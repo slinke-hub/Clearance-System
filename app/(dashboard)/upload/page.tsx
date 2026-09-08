@@ -8,12 +8,10 @@ import type { ColumnMapping, ZatcaClassification } from '@/types';
 import {
   Upload,
   FileSpreadsheet,
-  Map,
   Sparkles,
   CheckCircle2,
   Download,
   ChevronRight,
-  X,
   Loader2,
   AlertTriangle,
   RefreshCw,
@@ -38,12 +36,12 @@ interface ClassificationRow {
   classification: ZatcaClassification | null;
 }
 
-const STEPS: { id: Step; label: string; icon: React.ElementType }[] = [
-  { id: 'upload', label: 'Upload', icon: Upload },
-  { id: 'map', label: 'Map Columns', icon: Map },
-  { id: 'classify', label: 'Classify', icon: Sparkles },
-  { id: 'review', label: 'Review', icon: CheckCircle2 },
-  { id: 'export', label: 'Export', icon: Download },
+const STEPS: { id: Step; label: string }[] = [
+  { id: 'upload', label: 'Upload' },
+  { id: 'map', label: 'Map Columns' },
+  { id: 'classify', label: 'Classify' },
+  { id: 'review', label: 'Review' },
+  { id: 'export', label: 'Export' },
 ];
 
 export default function UploadPage() {
@@ -52,7 +50,6 @@ export default function UploadPage() {
   const [uploadResult, setUploadResult] = useState<UploadResult | null>(null);
   const [mapping, setMapping] = useState<Partial<ColumnMapping>>({});
   const [isUploading, setIsUploading] = useState(false);
-  const [isClassifying, setIsClassifying] = useState(false);
   const [classifyProgress, setClassifyProgress] = useState(0);
   const [results, setResults] = useState<ClassificationRow[]>([]);
   const [runId, setRunId] = useState<string | null>(null);
@@ -101,7 +98,6 @@ export default function UploadPage() {
       return;
     }
 
-    setIsClassifying(true);
     setClassifyProgress(0);
     setStep('classify');
 
@@ -166,7 +162,6 @@ export default function UploadPage() {
       toast.error(err instanceof Error ? err.message : 'Classification failed');
       setStep('map');
     } finally {
-      setIsClassifying(false);
     }
   };
 
@@ -203,7 +198,6 @@ export default function UploadPage() {
       <div className="glass-card p-4">
         <div className="flex items-center gap-2 overflow-x-auto">
           {STEPS.map((s, idx) => {
-            const Icon = s.icon;
             const isActive = s.id === step;
             const isComplete = idx < currentStepIndex;
             return (

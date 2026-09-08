@@ -1,24 +1,36 @@
 import { createServerClient } from '@supabase/ssr';
 import { NextResponse, type NextRequest } from 'next/server';
+import { isSupabaseConfigured } from '@/lib/supabase/config';
 
-export async function middleware(request: NextRequest) {
+export async function proxy(request: NextRequest) {
   let supabaseResponse = NextResponse.next({ request });
-
-  // 1. Check for local admin session cookie
-  const adminCookie = request.cookies.get('clearance_admin_session')?.value;
   let isAuthenticated = false;
 
+  const adminCookie = request.cookies.get('clearance_admin_session')?.value;
   if (adminCookie) {
     try {
       const parsed = JSON.parse(adminCookie);
-      if (parsed.email?.toLowerCase() === 'privatepple@gmail.com') {
-        isAuthenticated = true;
-      }
+      isAuthenticated =
+        typeof parsed.email === 'string' &&
+        parsed.email.toLowerCase() === 'privatepple@gmail.com';
     } catch {}
   }
 
-  // 2. Fallback check for Supabase session
-  if (!isAuthenticated && process.env.NEXT_PUBLIC_SUPABASE_URL?.startsWith('http')) {
+  const supabaseConfigured = isSupabaseConfigured();
+
+  // Local client sessions are only valid in development without Supabase.
+  if (!isAuthenticated && !supabaseConfigured && process.env.NODE_ENV !== 'production') {
+    const clientCookie = request.cookies.get('clearance_client_session')?.value;
+
+    if (clientCookie) {
+      try {
+        const parsed = JSON.parse(clientCookie);
+        isAuthenticated = typeof parsed.email === 'string' && parsed.email.includes('@');
+      } catch {}
+    }
+  }
+
+  if (!isAuthenticated && supabaseConfigured) {
     try {
       const supabase = createServerClient(
         process.env.NEXT_PUBLIC_SUPABASE_URL!,
@@ -43,19 +55,15 @@ export async function middleware(request: NextRequest) {
         data: { user },
       } = await supabase.auth.getUser();
 
-      if (user) {
-        isAuthenticated = true;
-      }
+      isAuthenticated = Boolean(user);
     } catch {
-      // Supabase not reachable / in mock mode
+      isAuthenticated = false;
     }
   }
 
   const { pathname } = request.nextUrl;
-
-  // Protected routes — require authentication
   const protectedPrefixes = ['/dashboard', '/upload', '/history', '/profile', '/team', '/admin'];
-  const isProtected = protectedPrefixes.some((p) => pathname.startsWith(p));
+  const isProtected = protectedPrefixes.some((path) => pathname.startsWith(path));
 
   if (isProtected && !isAuthenticated) {
     const redirectUrl = request.nextUrl.clone();
@@ -64,9 +72,7 @@ export async function middleware(request: NextRequest) {
     return NextResponse.redirect(redirectUrl);
   }
 
-  // If logged in and visiting auth pages, redirect to dashboard
-  const authPaths = ['/login', '/register'];
-  if (authPaths.includes(pathname) && isAuthenticated) {
+  if ((pathname === '/login' || pathname === '/register') && isAuthenticated) {
     return NextResponse.redirect(new URL('/dashboard', request.url));
   }
 

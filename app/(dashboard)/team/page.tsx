@@ -5,12 +5,7 @@ import { toast } from 'sonner';
 import {
   Users,
   UserPlus,
-  Shield,
-  Mail,
-  MoreVertical,
-  CheckCircle2,
   Trash2,
-  Building,
 } from 'lucide-react';
 
 interface TeamMember {
@@ -21,6 +16,8 @@ interface TeamMember {
   status: 'Active' | 'Pending';
   joinedAt: string;
 }
+
+type InviteRole = Exclude<TeamMember['role'], 'Owner'>;
 
 const INITIAL_MEMBERS: TeamMember[] = [
   {
@@ -52,7 +49,7 @@ const INITIAL_MEMBERS: TeamMember[] = [
 export default function TeamPage() {
   const [members, setMembers] = useState<TeamMember[]>(INITIAL_MEMBERS);
   const [inviteEmail, setInviteEmail] = useState('');
-  const [inviteRole, setInviteRole] = useState<'Admin' | 'Customs Specialist' | 'Auditor'>('Customs Specialist');
+  const [inviteRole, setInviteRole] = useState<InviteRole>('Customs Specialist');
   const [isInviting, setIsInviting] = useState(false);
 
   const handleInvite = (e: React.FormEvent) => {
@@ -116,7 +113,7 @@ export default function TeamPage() {
           <div className="w-full sm:w-56">
             <select
               value={inviteRole}
-              onChange={(e) => setInviteRole(e.target.value as any)}
+              onChange={(e) => setInviteRole(e.target.value as InviteRole)}
               className="form-input bg-surface-overlay border-surface-border text-white"
             >
               <option value="Customs Specialist">Customs Specialist</option>

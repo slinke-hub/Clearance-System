@@ -19,7 +19,16 @@ CREATE TABLE IF NOT EXISTS public.profiles (
   avatar_url    TEXT,
   phone         TEXT,
   company_name  TEXT,
+  company_name_ar TEXT,
+  cr_number     TEXT,
   vat_number    TEXT,
+  business_type TEXT DEFAULT 'individual' CHECK (business_type IN ('customs_broker', 'importer_exporter', 'freight_forwarder', 'individual')),
+  broker_license_no TEXT,
+  fasah_id      TEXT,
+  primary_port  TEXT,
+  industry_sector TEXT,
+  transport_license_no TEXT,
+  monthly_volume TEXT,
   org_id        UUID,
   created_at    TIMESTAMPTZ NOT NULL DEFAULT NOW(),
   updated_at    TIMESTAMPTZ NOT NULL DEFAULT NOW()
@@ -56,24 +65,18 @@ CREATE TABLE IF NOT EXISTS public.organizations (
   slug        TEXT UNIQUE NOT NULL,
   owner_id    UUID REFERENCES auth.users(id) ON DELETE SET NULL,
   logo_url    TEXT,
+  company_name_ar TEXT,
   vat_number  TEXT,
   cr_number   TEXT,
+  broker_license_no TEXT,
+  fasah_id    TEXT,
+  primary_port TEXT,
+  business_type TEXT,
   created_at  TIMESTAMPTZ NOT NULL DEFAULT NOW(),
   updated_at  TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
 
 ALTER TABLE public.organizations ENABLE ROW LEVEL SECURITY;
-
-CREATE POLICY "Org members can view their org"
-  ON public.organizations FOR SELECT
-  USING (EXISTS (
-    SELECT 1 FROM public.org_members om
-    WHERE om.org_id = id AND om.user_id = auth.uid()
-  ));
-
-CREATE POLICY "Org owner can update org"
-  ON public.organizations FOR UPDATE
-  USING (owner_id = auth.uid());
 
 -- ============================================================
 -- 3. ORG MEMBERS
@@ -90,19 +93,44 @@ CREATE TABLE IF NOT EXISTS public.org_members (
 
 ALTER TABLE public.org_members ENABLE ROW LEVEL SECURITY;
 
+CREATE OR REPLACE FUNCTION public.is_org_member(target_org_id UUID)
+RETURNS BOOLEAN LANGUAGE SQL STABLE SECURITY DEFINER SET search_path = public AS $$
+  SELECT EXISTS (
+    SELECT 1 FROM public.org_members
+    WHERE org_id = target_org_id AND user_id = auth.uid()
+  );
+$$;
+
+CREATE OR REPLACE FUNCTION public.is_org_admin(target_org_id UUID)
+RETURNS BOOLEAN LANGUAGE SQL STABLE SECURITY DEFINER SET search_path = public AS $$
+  SELECT EXISTS (
+    SELECT 1 FROM public.org_members
+    WHERE org_id = target_org_id AND user_id = auth.uid() AND role IN ('owner', 'admin')
+  );
+$$;
+
+REVOKE ALL ON FUNCTION public.is_org_member(UUID) FROM PUBLIC;
+REVOKE ALL ON FUNCTION public.is_org_admin(UUID) FROM PUBLIC;
+GRANT EXECUTE ON FUNCTION public.is_org_member(UUID) TO authenticated;
+GRANT EXECUTE ON FUNCTION public.is_org_admin(UUID) TO authenticated;
+
+CREATE POLICY "Org members can view their org"
+  ON public.organizations FOR SELECT
+  USING (public.is_org_member(id));
+
+CREATE POLICY "Org owner can update org"
+  ON public.organizations FOR UPDATE
+  USING (owner_id = auth.uid())
+  WITH CHECK (owner_id = auth.uid());
+
 CREATE POLICY "Members can view their org members"
   ON public.org_members FOR SELECT
-  USING (user_id = auth.uid() OR EXISTS (
-    SELECT 1 FROM public.org_members om
-    WHERE om.org_id = org_id AND om.user_id = auth.uid()
-  ));
+  USING (public.is_org_member(org_id));
 
 CREATE POLICY "Org admins can manage members"
   ON public.org_members FOR ALL
-  USING (EXISTS (
-    SELECT 1 FROM public.org_members om
-    WHERE om.org_id = org_id AND om.user_id = auth.uid() AND om.role IN ('owner', 'admin')
-  ));
+  USING (public.is_org_admin(org_id))
+  WITH CHECK (public.is_org_admin(org_id));
 
 -- ============================================================
 -- 4. SUBSCRIPTIONS
@@ -248,16 +276,76 @@ CREATE POLICY "System can insert audit logs"
 CREATE OR REPLACE FUNCTION public.handle_new_user()
 RETURNS TRIGGER LANGUAGE plpgsql SECURITY DEFINER SET search_path = public AS $$
 BEGIN
-  INSERT INTO public.profiles (id, email, full_name, user_type)
+  INSERT INTO public.profiles (
+    id,
+    email,
+    full_name,
+    user_type,
+    business_type,
+    company_name,
+    company_name_ar,
+    cr_number,
+    vat_number,
+    phone,
+    broker_license_no,
+    fasah_id,
+    primary_port,
+    industry_sector,
+    transport_license_no,
+    monthly_volume,
+    role
+  )
   VALUES (
     NEW.id,
     NEW.email,
     COALESCE(NEW.raw_user_meta_data->>'full_name', ''),
-    COALESCE(NEW.raw_user_meta_data->>'user_type', 'individual')
-  );
+    COALESCE(NEW.raw_user_meta_data->>'user_type', 'individual'),
+    COALESCE(NEW.raw_user_meta_data->>'business_type', 'individual'),
+    NEW.raw_user_meta_data->>'company_name',
+    NEW.raw_user_meta_data->>'company_name_ar',
+    NEW.raw_user_meta_data->>'cr_number',
+    NEW.raw_user_meta_data->>'vat_number',
+    NEW.raw_user_meta_data->>'phone',
+    NEW.raw_user_meta_data->>'broker_license_no',
+    NEW.raw_user_meta_data->>'fasah_id',
+    NEW.raw_user_meta_data->>'primary_port',
+    NEW.raw_user_meta_data->>'industry_sector',
+    NEW.raw_user_meta_data->>'transport_license_no',
+    NEW.raw_user_meta_data->>'monthly_volume',
+    COALESCE(NEW.raw_user_meta_data->>'role', 'user')
+  )
+  ON CONFLICT (id) DO UPDATE
+  SET full_name = EXCLUDED.full_name,
+      user_type = EXCLUDED.user_type,
+      business_type = EXCLUDED.business_type,
+      company_name = EXCLUDED.company_name,
+      company_name_ar = EXCLUDED.company_name_ar,
+      cr_number = EXCLUDED.cr_number,
+      vat_number = EXCLUDED.vat_number,
+      phone = EXCLUDED.phone,
+      broker_license_no = EXCLUDED.broker_license_no,
+      fasah_id = EXCLUDED.fasah_id,
+      primary_port = EXCLUDED.primary_port,
+      industry_sector = EXCLUDED.industry_sector,
+      transport_license_no = EXCLUDED.transport_license_no,
+      monthly_volume = EXCLUDED.monthly_volume,
+      updated_at = NOW();
 
   INSERT INTO public.subscriptions (user_id, plan, monthly_limit)
-  VALUES (NEW.id, 'free', 5);
+  VALUES (
+    NEW.id,
+    CASE
+      WHEN NEW.raw_user_meta_data->>'business_type' IN ('customs_broker', 'freight_forwarder') THEN 'enterprise'
+      WHEN NEW.raw_user_meta_data->>'business_type' = 'importer_exporter' THEN 'pro'
+      ELSE 'free'
+    END,
+    CASE
+      WHEN NEW.raw_user_meta_data->>'business_type' IN ('customs_broker', 'freight_forwarder') THEN 999999
+      WHEN NEW.raw_user_meta_data->>'business_type' = 'importer_exporter' THEN 50
+      ELSE 5
+    END
+  )
+  ON CONFLICT (user_id) DO NOTHING;
 
   RETURN NEW;
 END;

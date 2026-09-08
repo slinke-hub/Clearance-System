@@ -9,9 +9,6 @@ import {
   Search,
   Filter,
   CheckCircle2,
-  Clock,
-  AlertCircle,
-  ExternalLink,
   Upload,
 } from 'lucide-react';
 

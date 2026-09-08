@@ -1,5 +1,16 @@
 import * as XLSX from 'xlsx';
-import type { InvoiceLineItem, ClassificationResult } from '@/types';
+import type { ClassificationResult } from '@/types';
+
+export interface ExportableLineItem {
+  row_index: number;
+  item_name?: string | null;
+  item_description?: string | null;
+  quantity?: string | null;
+  unit_price?: string | null;
+  total_price?: string | null;
+  currency?: string | null;
+  classification?: Partial<ClassificationResult>;
+}
 
 export interface ExportRow {
   'Row #': number;
@@ -22,7 +33,7 @@ export interface ExportRow {
  * Returns a Buffer ready to be sent as a file download.
  */
 export function generateEnrichedExcel(
-  items: (InvoiceLineItem & { classification?: ClassificationResult })[],
+  items: ExportableLineItem[],
   originalFileName: string
 ): Buffer {
   const rows: ExportRow[] = items.map((item) => ({

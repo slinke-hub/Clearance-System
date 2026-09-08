@@ -3,77 +3,153 @@
 import React, { useState } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
-import { createClient } from '@/lib/supabase/client';
 import { useI18n } from '@/lib/i18n/context';
 import { toast } from 'sonner';
-import { Eye, EyeOff, Loader2, ShieldCheck, Building2, User } from 'lucide-react';
-import type { UserType } from '@/types';
+import {
+  Building2,
+  Eye,
+  EyeOff,
+  Loader2,
+  ShieldCheck,
+  Ship,
+  Truck,
+  User,
+  type LucideIcon,
+} from 'lucide-react';
+import type { ClearanceBusinessType } from '@/types';
+
+interface RegistrationFormData {
+  fullName: string;
+  email: string;
+  phone: string;
+  password: string;
+  confirmPassword: string;
+  companyName: string;
+  companyNameAr: string;
+  crNumber: string;
+  vatNumber: string;
+  brokerLicenseNo: string;
+  fasahId: string;
+  primaryPort: string;
+  industrySector: string;
+  transportLicenseNo: string;
+  monthlyVolume: string;
+}
+
+const initialFormData: RegistrationFormData = {
+  fullName: '',
+  email: '',
+  phone: '',
+  password: '',
+  confirmPassword: '',
+  companyName: '',
+  companyNameAr: '',
+  crNumber: '',
+  vatNumber: '',
+  brokerLicenseNo: '',
+  fasahId: '',
+  primaryPort: '',
+  industrySector: '',
+  transportLicenseNo: '',
+  monthlyVolume: '',
+};
+
+const businessOptions: Array<{
+  value: ClearanceBusinessType;
+  labelKey: string;
+  icon: LucideIcon;
+}> = [
+  { value: 'customs_broker', labelKey: 'customsBroker', icon: ShieldCheck },
+  { value: 'importer_exporter', labelKey: 'importerExporter', icon: Ship },
+  { value: 'freight_forwarder', labelKey: 'freightForwarder', icon: Truck },
+  { value: 'individual', labelKey: 'individual', icon: User },
+];
+
+interface RegistrationFieldProps extends React.InputHTMLAttributes<HTMLInputElement> {
+  id: keyof RegistrationFormData;
+  label: string;
+  optionalLabel?: string;
+}
+
+function RegistrationField({
+  id,
+  label,
+  optionalLabel,
+  required,
+  ...inputProps
+}: RegistrationFieldProps) {
+  return (
+    <div>
+      <label className="form-label flex items-center justify-between gap-3" htmlFor={id}>
+        <span>{label}</span>
+        {!required && optionalLabel ? (
+          <span className="text-[10px] uppercase tracking-wide text-muted/60">{optionalLabel}</span>
+        ) : null}
+      </label>
+      <input id={id} className="form-input" required={required} {...inputProps} />
+    </div>
+  );
+}
 
 export default function RegisterPage() {
   const { t } = useI18n();
   const router = useRouter();
-  const supabase = createClient();
-  const [formData, setFormData] = useState({
-    fullName: '',
-    email: '',
-    password: '',
-    confirmPassword: '',
-  });
-  const [userType, setUserType] = useState<UserType>('individual');
+  const [formData, setFormData] = useState<RegistrationFormData>(initialFormData);
+  const [businessType, setBusinessType] = useState<ClearanceBusinessType>('customs_broker');
   const [showPassword, setShowPassword] = useState(false);
   const [loading, setLoading] = useState(false);
 
-  const handleChange = (field: string, value: string) => {
-    setFormData((prev) => ({ ...prev, [field]: value }));
+  const isBusinessAccount = businessType !== 'individual';
+
+  const handleChange = (field: keyof RegistrationFormData, value: string) => {
+    setFormData((previous) => ({ ...previous, [field]: value }));
   };
 
-  const handleRegister = async (e: React.FormEvent) => {
-    e.preventDefault();
+  const handleRegister = async (event: React.FormEvent<HTMLFormElement>) => {
+    event.preventDefault();
+
     if (formData.password !== formData.confirmPassword) {
-      toast.error('Passwords do not match');
+      toast.error(t('auth', 'passwordMismatch'));
       return;
     }
+
     if (formData.password.length < 8) {
-      toast.error('Password must be at least 8 characters');
+      toast.error(t('auth', 'passwordLength'));
       return;
     }
 
     setLoading(true);
+
     try {
-      const { error } = await supabase.auth.signUp({
-        email: formData.email,
-        password: formData.password,
-        options: {
-          data: {
-            full_name: formData.fullName,
-            user_type: userType,
-          },
-        },
+      const registrationData = { ...formData, confirmPassword: undefined };
+      const response = await fetch('/api/auth/register', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ ...registrationData, businessType }),
       });
+      const data = await response.json();
 
-      if (error) throw error;
+      if (!response.ok) throw new Error(data.error || 'Registration failed');
 
-      toast.success('Account created! You can now sign in.');
-      router.push('/dashboard');
+      toast.success(data.message || t('auth', 'registrationSuccess'));
+      router.replace(data.requiresEmailConfirmation ? '/login' : '/dashboard');
       router.refresh();
-    } catch (err: unknown) {
-      const message = err instanceof Error ? err.message : 'Registration failed';
-      toast.error(message);
+    } catch (error: unknown) {
+      toast.error(error instanceof Error ? error.message : 'Registration failed');
     } finally {
       setLoading(false);
     }
   };
 
   return (
-    <div className="min-h-screen bg-hero-gradient flex items-center justify-center p-4">
+    <main className="min-h-screen bg-hero-gradient flex items-center justify-center p-4 py-10">
       <div className="absolute inset-0 overflow-hidden pointer-events-none">
-        <div className="absolute top-1/3 right-1/4 w-96 h-96 bg-brand-teal/10 rounded-full blur-3xl" />
-        <div className="absolute bottom-1/3 left-1/4 w-64 h-64 bg-brand-gold/10 rounded-full blur-3xl" />
+        <div className="absolute top-1/4 right-1/4 w-96 h-96 bg-brand-teal/10 rounded-full blur-3xl" />
+        <div className="absolute bottom-1/4 left-1/4 w-72 h-72 bg-brand-gold/10 rounded-full blur-3xl" />
       </div>
 
-      <div className="w-full max-w-md animate-slide-up relative z-10">
-        {/* Logo */}
-        <div className="text-center mb-8">
+      <div className="w-full max-w-4xl animate-slide-up relative z-10">
+        <div className="text-center mb-7">
           <div className="inline-flex items-center justify-center w-16 h-16 rounded-2xl bg-brand-teal/20 border border-brand-teal/30 mb-4 shadow-glow">
             <ShieldCheck className="w-8 h-8 text-brand-teal-light" />
           </div>
@@ -81,114 +157,241 @@ export default function RegisterPage() {
           <p className="text-muted text-sm mt-1">{t('common', 'tagline')}</p>
         </div>
 
-        <div className="glass-card p-8">
-          <h2 className="text-xl font-semibold text-white mb-1">{t('auth', 'registerTitle')}</h2>
-          <p className="text-muted text-sm mb-6">{t('auth', 'registerSubtitle')}</p>
-
-          {/* User Type Selector */}
-          <div className="grid grid-cols-2 gap-3 mb-5">
-            <button
-              id="type-individual"
-              type="button"
-              onClick={() => setUserType('individual')}
-              className={`flex flex-col items-center gap-2 p-4 rounded-xl border transition-all duration-200 ${
-                userType === 'individual'
-                  ? 'border-brand-teal bg-brand-teal/15 text-brand-teal-light'
-                  : 'border-surface-border bg-surface-overlay text-muted hover:border-brand-teal/40'
-              }`}
-            >
-              <User className="w-5 h-5" />
-              <span className="text-sm font-medium">{t('auth', 'individual')}</span>
-            </button>
-            <button
-              id="type-enterprise"
-              type="button"
-              onClick={() => setUserType('enterprise')}
-              className={`flex flex-col items-center gap-2 p-4 rounded-xl border transition-all duration-200 ${
-                userType === 'enterprise'
-                  ? 'border-brand-gold bg-brand-gold/15 text-brand-gold'
-                  : 'border-surface-border bg-surface-overlay text-muted hover:border-brand-gold/40'
-              }`}
-            >
-              <Building2 className="w-5 h-5" />
-              <span className="text-sm font-medium">{t('auth', 'enterprise')}</span>
-            </button>
+        <div className="glass-card p-6 sm:p-8">
+          <div className="mb-6">
+            <h2 className="text-xl font-semibold text-white">{t('auth', 'registerTitle')}</h2>
+            <p className="text-muted text-sm mt-1">{t('auth', 'registerSubtitle')}</p>
           </div>
 
-          <form onSubmit={handleRegister} className="space-y-4">
-            <div>
-              <label className="form-label">{t('auth', 'fullName')}</label>
-              <input
-                id="register-name"
-                type="text"
-                className="form-input"
-                placeholder="Mohammed Al-Rashidi"
-                value={formData.fullName}
-                onChange={(e) => handleChange('fullName', e.target.value)}
-                required
-                autoComplete="name"
-              />
+          <fieldset className="mb-7">
+            <legend className="form-label mb-1">{t('auth', 'userType')}</legend>
+            <p className="text-xs text-muted/80 mb-3">{t('auth', 'businessTypeHelp')}</p>
+            <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
+              {businessOptions.map(({ value, labelKey, icon: Icon }) => {
+                const selected = businessType === value;
+                return (
+                  <button
+                    key={value}
+                    type="button"
+                    aria-pressed={selected}
+                    onClick={() => setBusinessType(value)}
+                    className={`flex min-h-24 flex-col items-center justify-center gap-2 rounded-xl border p-3 text-center transition-all duration-200 ${
+                      selected
+                        ? 'border-brand-teal bg-brand-teal/15 text-brand-teal-light shadow-glow'
+                        : 'border-surface-border bg-surface-overlay text-muted hover:border-brand-teal/40 hover:text-white'
+                    }`}
+                  >
+                    <Icon className="w-5 h-5" />
+                    <span className="text-xs sm:text-sm font-medium">{t('auth', labelKey)}</span>
+                  </button>
+                );
+              })}
             </div>
+          </fieldset>
 
-            <div>
-              <label className="form-label">{t('auth', 'email')}</label>
-              <input
-                id="register-email"
-                type="email"
-                className="form-input"
-                placeholder="you@company.com"
-                value={formData.email}
-                onChange={(e) => handleChange('email', e.target.value)}
-                required
-                autoComplete="email"
-              />
-            </div>
-
-            <div>
-              <label className="form-label">{t('auth', 'password')}</label>
-              <div className="relative">
-                <input
-                  id="register-password"
-                  type={showPassword ? 'text' : 'password'}
-                  className="form-input pr-10"
-                  placeholder="Min. 8 characters"
-                  value={formData.password}
-                  onChange={(e) => handleChange('password', e.target.value)}
+          <form onSubmit={handleRegister} className="space-y-7">
+            <section>
+              <h3 className="text-sm font-semibold text-white mb-4 flex items-center gap-2">
+                <User className="w-4 h-4 text-brand-teal-light" />
+                {t('auth', 'contactDetails')}
+              </h3>
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                <RegistrationField
+                  id="fullName"
+                  label={t('auth', 'fullName')}
+                  type="text"
+                  placeholder="Mohammed Al-Rashidi"
+                  value={formData.fullName}
+                  onChange={(event) => handleChange('fullName', event.target.value)}
+                  autoComplete="name"
                   required
-                  autoComplete="new-password"
                 />
-                <button
-                  type="button"
-                  onClick={() => setShowPassword(!showPassword)}
-                  className="absolute right-3 top-1/2 -translate-y-1/2 text-muted hover:text-white transition-colors"
-                >
-                  {showPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
-                </button>
+                <RegistrationField
+                  id="phone"
+                  label={t('auth', 'phone')}
+                  optionalLabel={t('auth', 'optional')}
+                  type="tel"
+                  placeholder="+966 50 123 4567"
+                  value={formData.phone}
+                  onChange={(event) => handleChange('phone', event.target.value)}
+                  autoComplete="tel"
+                />
+                <RegistrationField
+                  id="email"
+                  label={t('auth', 'email')}
+                  type="email"
+                  placeholder="you@company.com"
+                  value={formData.email}
+                  onChange={(event) => handleChange('email', event.target.value)}
+                  autoComplete="email"
+                  required
+                />
+                <div>
+                  <label className="form-label" htmlFor="password">{t('auth', 'password')}</label>
+                  <div className="relative">
+                    <input
+                      id="password"
+                      type={showPassword ? 'text' : 'password'}
+                      className="form-input pe-10"
+                      placeholder="••••••••"
+                      value={formData.password}
+                      onChange={(event) => handleChange('password', event.target.value)}
+                      minLength={8}
+                      autoComplete="new-password"
+                      required
+                    />
+                    <button
+                      type="button"
+                      aria-label={showPassword ? 'Hide password' : 'Show password'}
+                      onClick={() => setShowPassword((visible) => !visible)}
+                      className="absolute end-3 top-1/2 -translate-y-1/2 text-muted hover:text-white transition-colors"
+                    >
+                      {showPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+                    </button>
+                  </div>
+                </div>
+                <RegistrationField
+                  id="confirmPassword"
+                  label={t('auth', 'confirmPassword')}
+                  type={showPassword ? 'text' : 'password'}
+                  placeholder="••••••••"
+                  value={formData.confirmPassword}
+                  onChange={(event) => handleChange('confirmPassword', event.target.value)}
+                  minLength={8}
+                  autoComplete="new-password"
+                  required
+                />
               </div>
-            </div>
+            </section>
 
-            <div>
-              <label className="form-label">Confirm Password</label>
-              <input
-                id="register-confirm-password"
-                type="password"
-                className="form-input"
-                placeholder="Repeat password"
-                value={formData.confirmPassword}
-                onChange={(e) => handleChange('confirmPassword', e.target.value)}
-                required
-                autoComplete="new-password"
-              />
-            </div>
+            {isBusinessAccount ? (
+              <section className="border-t border-surface-border pt-6">
+                <h3 className="text-sm font-semibold text-white mb-4 flex items-center gap-2">
+                  <Building2 className="w-4 h-4 text-brand-gold" />
+                  {t('auth', 'businessDetails')}
+                </h3>
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                  <RegistrationField
+                    id="companyName"
+                    label={t('auth', 'companyName')}
+                    type="text"
+                    value={formData.companyName}
+                    onChange={(event) => handleChange('companyName', event.target.value)}
+                    autoComplete="organization"
+                    required
+                  />
+                  <RegistrationField
+                    id="companyNameAr"
+                    label={t('auth', 'companyNameAr')}
+                    optionalLabel={t('auth', 'optional')}
+                    type="text"
+                    dir="rtl"
+                    value={formData.companyNameAr}
+                    onChange={(event) => handleChange('companyNameAr', event.target.value)}
+                  />
+                  <RegistrationField
+                    id="crNumber"
+                    label={t('auth', 'crNumber')}
+                    type="text"
+                    inputMode="numeric"
+                    value={formData.crNumber}
+                    onChange={(event) => handleChange('crNumber', event.target.value)}
+                    required
+                  />
+                  <RegistrationField
+                    id="vatNumber"
+                    label={t('auth', 'vatNumber')}
+                    optionalLabel={t('auth', 'optional')}
+                    type="text"
+                    inputMode="numeric"
+                    value={formData.vatNumber}
+                    onChange={(event) => handleChange('vatNumber', event.target.value)}
+                  />
+
+                  {businessType === 'customs_broker' ? (
+                    <>
+                      <RegistrationField
+                        id="brokerLicenseNo"
+                        label={t('auth', 'brokerLicenseNo')}
+                        optionalLabel={t('auth', 'optional')}
+                        type="text"
+                        value={formData.brokerLicenseNo}
+                        onChange={(event) => handleChange('brokerLicenseNo', event.target.value)}
+                      />
+                      <RegistrationField
+                        id="fasahId"
+                        label={t('auth', 'fasahId')}
+                        optionalLabel={t('auth', 'optional')}
+                        type="text"
+                        value={formData.fasahId}
+                        onChange={(event) => handleChange('fasahId', event.target.value)}
+                      />
+                    </>
+                  ) : null}
+
+                  {businessType === 'importer_exporter' ? (
+                    <RegistrationField
+                      id="industrySector"
+                      label={t('auth', 'industrySector')}
+                      optionalLabel={t('auth', 'optional')}
+                      type="text"
+                      value={formData.industrySector}
+                      onChange={(event) => handleChange('industrySector', event.target.value)}
+                    />
+                  ) : null}
+
+                  {businessType === 'freight_forwarder' ? (
+                    <>
+                      <RegistrationField
+                        id="transportLicenseNo"
+                        label={t('auth', 'transportLicenseNo')}
+                        optionalLabel={t('auth', 'optional')}
+                        type="text"
+                        value={formData.transportLicenseNo}
+                        onChange={(event) => handleChange('transportLicenseNo', event.target.value)}
+                      />
+                      <RegistrationField
+                        id="fasahId"
+                        label={t('auth', 'fasahId')}
+                        optionalLabel={t('auth', 'optional')}
+                        type="text"
+                        value={formData.fasahId}
+                        onChange={(event) => handleChange('fasahId', event.target.value)}
+                      />
+                    </>
+                  ) : null}
+
+                  <RegistrationField
+                    id="primaryPort"
+                    label={t('auth', 'primaryPort')}
+                    optionalLabel={t('auth', 'optional')}
+                    type="text"
+                    value={formData.primaryPort}
+                    onChange={(event) => handleChange('primaryPort', event.target.value)}
+                  />
+                  <RegistrationField
+                    id="monthlyVolume"
+                    label={t('auth', 'monthlyVolume')}
+                    optionalLabel={t('auth', 'optional')}
+                    type="text"
+                    placeholder="1–10, 11–50, 51–200, 200+"
+                    value={formData.monthlyVolume}
+                    onChange={(event) => handleChange('monthlyVolume', event.target.value)}
+                  />
+                </div>
+              </section>
+            ) : null}
 
             <button
               id="register-submit"
               type="submit"
               disabled={loading}
-              className="btn-primary w-full py-3 text-base font-semibold mt-2"
+              className="btn-primary w-full py-3 text-base font-semibold"
             >
               {loading ? (
-                <><Loader2 className="w-4 h-4 animate-spin" /> {t('common', 'loading')}</>
+                <>
+                  <Loader2 className="w-4 h-4 animate-spin" /> {t('auth', 'creatingAccount')}
+                </>
               ) : (
                 t('auth', 'signUp')
               )}
@@ -204,9 +407,9 @@ export default function RegisterPage() {
         </div>
 
         <p className="text-center text-xs text-muted/60 mt-6">
-          🇸🇦 Free Trial includes 5 invoices/month — no credit card required
+          🇸🇦 Free trial includes 5 invoices per month — no credit card required
         </p>
       </div>
-    </div>
+    </main>
   );
 }

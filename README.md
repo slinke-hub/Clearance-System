@@ -59,7 +59,7 @@ SUPABASE_SERVICE_ROLE_KEY=your-service-role-key
 
 NVIDIA_NIM_API_KEY=your-api-key
 NVIDIA_NIM_BASE_URL=https://integrate.api.nvidia.com/v1
-NVIDIA_NIM_MODEL=nvidia/llama-3.1-nemotron-70b-instruct
+NVIDIA_NIM_MODEL=moonshotai/kimi-k3
 ```
 
 ### 4. Database Setup

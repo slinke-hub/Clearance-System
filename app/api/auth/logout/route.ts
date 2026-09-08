@@ -6,6 +6,7 @@ export async function POST() {
 
   // Clear admin session cookie
   response.cookies.delete('clearance_admin_session');
+  response.cookies.delete('clearance_client_session');
 
   // Sign out from Supabase if connected
   try {

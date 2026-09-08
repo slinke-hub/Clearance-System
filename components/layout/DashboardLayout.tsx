@@ -15,7 +15,6 @@ import {
   ShieldCheck,
   LogOut,
   Menu,
-  X,
   ChevronRight,
   Globe,
 } from 'lucide-react';
@@ -65,7 +64,7 @@ export function DashboardLayout({ children, userRole, userName, plan }: Dashboar
     return true;
   });
 
-  const SidebarContent = () => (
+  const renderSidebarContent = () => (
     <div className="flex flex-col h-full">
       {/* Logo */}
       <div className="p-5 border-b border-surface-border">
@@ -148,7 +147,7 @@ export function DashboardLayout({ children, userRole, userName, plan }: Dashboar
     <div className={`flex h-screen overflow-hidden bg-[#0D1117] ${isRTL ? 'rtl' : 'ltr'}`}>
       {/* Desktop Sidebar */}
       <aside className="hidden md:flex w-60 shrink-0 flex-col border-r border-surface-border bg-surface/80 backdrop-blur-glass">
-        <SidebarContent />
+        {renderSidebarContent()}
       </aside>
 
       {/* Mobile Sidebar Overlay */}
@@ -159,7 +158,7 @@ export function DashboardLayout({ children, userRole, userName, plan }: Dashboar
             onClick={() => setSidebarOpen(false)}
           />
           <aside className="absolute inset-y-0 left-0 w-60 bg-surface border-r border-surface-border flex flex-col animate-slide-in-right">
-            <SidebarContent />
+            {renderSidebarContent()}
           </aside>
         </div>
       )}
