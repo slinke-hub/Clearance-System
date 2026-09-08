@@ -41,16 +41,16 @@ interface ClassificationRow {
   classification: ZatcaClassification | null;
 }
 
-const STEPS: { id: Step; label: string }[] = [
-  { id: 'upload', label: 'Upload' },
-  { id: 'map', label: 'Map Columns' },
-  { id: 'classify', label: 'Classify' },
-  { id: 'review', label: 'Review' },
-  { id: 'export', label: 'Export' },
+const STEPS: { id: Step; labelKey: string }[] = [
+  { id: 'upload', labelKey: 'step1' },
+  { id: 'map', labelKey: 'step2' },
+  { id: 'classify', labelKey: 'step3' },
+  { id: 'review', labelKey: 'step4' },
+  { id: 'export', labelKey: 'step5' },
 ];
 
 export default function UploadPage() {
-  const { t } = useI18n();
+  const { t, isRTL } = useI18n();
   const [step, setStep] = useState<Step>('upload');
   const [uploadResult, setUploadResult] = useState<UploadResult | null>(null);
   const [mapping, setMapping] = useState<Partial<ColumnMapping>>({});
@@ -72,19 +72,19 @@ export default function UploadPage() {
       const res = await fetch('/api/invoices/upload', { method: 'POST', body: formData });
       const data = await res.json();
 
-      if (!res.ok) throw new Error(data.error || 'Upload failed');
+      if (!res.ok) throw new Error(t('upload', 'uploadFailed'));
 
       setUploadResult(data);
       setMapping(data.autoMapping || {});
       setRunId(data.runId);
-      toast.success(`Parsed ${data.totalRows} rows from ${data.fileName}`);
+      toast.success(t('upload', 'parsedRows', { count: data.totalRows, file: data.fileName }));
       setStep('map');
     } catch (err: unknown) {
-      toast.error(err instanceof Error ? err.message : 'Upload failed');
+      toast.error(err instanceof Error ? err.message : t('upload', 'uploadFailed'));
     } finally {
       setIsUploading(false);
     }
-  }, []);
+  }, [t]);
 
   const { getRootProps, getInputProps, isDragActive } = useDropzone({
     onDrop,
@@ -99,7 +99,7 @@ export default function UploadPage() {
   // ── Classify ───────────────────────────────────────────────
   const handleClassify = async () => {
     if (!runId || !uploadResult || !mapping.itemName) {
-      toast.error('Please select at least the Item Name column');
+      toast.error(t('upload', 'itemNameRequired'));
       return;
     }
 
@@ -110,7 +110,7 @@ export default function UploadPage() {
       const items = uploadResult.preview.length > 0
         ? Array.from({ length: uploadResult.totalRows }, (_, i) => ({
             rowIndex: i,
-            itemName: String(uploadResult.preview[i]?.[mapping.itemName!] || `Item ${i + 1}`),
+            itemName: String(uploadResult.preview[i]?.[mapping.itemName!] || t('upload', 'itemFallback', { count: i + 1 })),
             itemDescription: mapping.itemDescription
               ? String(uploadResult.preview[i]?.[mapping.itemDescription] || '')
               : '',
@@ -126,7 +126,7 @@ export default function UploadPage() {
       });
 
       const data = await res.json();
-      if (!res.ok) throw new Error(data.error || 'Classification failed');
+      if (!res.ok) throw new Error(t('upload', 'classificationFailed'));
 
       setClassifyProgress(100);
 
@@ -139,10 +139,10 @@ export default function UploadPage() {
       }));
 
       setResults(rows);
-      toast.success(`Classified ${rows.length} items successfully`);
+      toast.success(t('upload', 'classifiedSuccess', { count: rows.length }));
       setStep('review');
     } catch (err: unknown) {
-      toast.error(err instanceof Error ? err.message : 'Classification failed');
+      toast.error(err instanceof Error ? err.message : t('upload', 'classificationFailed'));
       setStep('map');
     } finally {
     }
@@ -158,7 +158,7 @@ export default function UploadPage() {
     document.body.appendChild(a);
     a.click();
     document.body.removeChild(a);
-    toast.success('Export started! Check your downloads.');
+    toast.success(t('upload', 'exportStarted'));
     setStep('export');
   };
 
@@ -198,10 +198,10 @@ export default function UploadPage() {
                   }`}>
                     {isComplete ? '✓' : idx + 1}
                   </div>
-                  <span className="text-xs font-medium whitespace-nowrap">{s.label}</span>
+                  <span className="text-xs font-medium whitespace-nowrap">{t('upload', s.labelKey)}</span>
                 </div>
                 {idx < STEPS.length - 1 && (
-                  <ChevronRight className="w-3.5 h-3.5 text-surface-border shrink-0" />
+                  <ChevronRight className={`w-3.5 h-3.5 text-surface-border shrink-0 ${isRTL ? 'rotate-180' : ''}`} />
                 )}
               </React.Fragment>
             );
@@ -214,11 +214,11 @@ export default function UploadPage() {
         <div className="glass-card p-6">
           <h2 className="text-base font-semibold text-white mb-4">{t('upload', 'step1')}</h2>
           <div {...getRootProps()} className={`dropzone ${isDragActive ? 'active' : ''}`}>
-            <input {...getInputProps()} id="file-dropzone" />
+            <input {...getInputProps({ 'aria-label': t('upload', 'fileUpload') })} id="file-dropzone" />
             {isUploading ? (
               <div className="flex flex-col items-center gap-3">
                 <Loader2 className="w-10 h-10 text-brand-teal-light animate-spin" />
-                <p className="text-sm text-muted">Parsing your Excel file...</p>
+                <p className="text-sm text-muted">{t('upload', 'parsing')}</p>
               </div>
             ) : (
               <>
@@ -251,7 +251,7 @@ export default function UploadPage() {
 
           {/* Preview */}
           <div className="rounded-xl bg-surface-overlay border border-surface-border p-3 overflow-x-auto text-xs text-muted">
-            <p className="font-medium text-white mb-2">Detected {uploadResult.totalRows} rows · {uploadResult.headers.length} columns</p>
+            <p className="font-medium text-white mb-2">{t('upload', 'detected', { rows: uploadResult.totalRows, columns: uploadResult.headers.length })}</p>
             <div className="flex gap-2 flex-wrap">
               {uploadResult.headers.map((h) => (
                 <span key={h} className="badge badge-muted">{h}</span>
@@ -272,7 +272,7 @@ export default function UploadPage() {
               <div key={field}>
                 <label className="form-label">
                   {label} {required && <span className="text-error">*</span>}
-                  {!required && <span className="text-muted/60 ml-1">{t('upload', 'optional')}</span>}
+                  {!required && <span className="text-muted/60 ms-1">{t('upload', 'optional')}</span>}
                 </label>
                 <select
                   id={`map-${field}`}
@@ -282,7 +282,7 @@ export default function UploadPage() {
                     setMapping((prev) => ({ ...prev, [field]: e.target.value || undefined }))
                   }
                 >
-                  <option value="">— Select column —</option>
+                  <option value="">— {t('upload', 'selectColumn')} —</option>
                   {uploadResult.headers.map((h) => (
                     <option key={h} value={h}>{h}</option>
                   ))}
@@ -294,13 +294,13 @@ export default function UploadPage() {
           {!mapping.itemName && (
             <div className="flex items-center gap-2 text-warning text-xs p-3 rounded-xl bg-warning/10 border border-warning/20">
               <AlertTriangle className="w-4 h-4 shrink-0" />
-              Item Name column is required to proceed.
+              {t('upload', 'itemNameRequiredProceed')}
             </div>
           )}
 
           <div className="flex gap-3">
             <button onClick={() => setStep('upload')} className="btn-ghost">
-              ← Back
+              {isRTL ? '→' : '←'} {t('upload', 'back')}
             </button>
             <button
               id="start-classify-btn"
@@ -325,7 +325,7 @@ export default function UploadPage() {
           <div>
             <p className="text-lg font-semibold text-white">{t('upload', 'classifying')}</p>
             <p className="text-sm text-muted mt-1">
-              NVIDIA NIM AI is analyzing each item against ZATCA HS-Code taxonomy...
+              {t('upload', 'aiAnalyzing')}
             </p>
           </div>
           <div className="w-full max-w-xs">
@@ -335,7 +335,7 @@ export default function UploadPage() {
                 style={{ width: `${classifyProgress}%` }}
               />
             </div>
-            <p className="text-xs text-muted mt-2">{classifyProgress}% complete</p>
+            <p className="text-xs text-muted mt-2">{classifyProgress}% {t('upload', 'complete')}</p>
           </div>
         </div>
       )}
@@ -345,16 +345,16 @@ export default function UploadPage() {
         <div className="space-y-4">
           <div className="glass-card p-5 flex items-center justify-between flex-wrap gap-3">
             <div>
-              <h2 className="text-base font-semibold text-white">Classification Results</h2>
-              <p className="text-xs text-muted mt-0.5">{results.length} items classified</p>
+              <h2 className="text-base font-semibold text-white">{t('upload', 'classificationResults')}</h2>
+              <p className="text-xs text-muted mt-0.5">{t('upload', 'itemsClassified', { count: results.length })}</p>
             </div>
             <div className="flex gap-2 flex-wrap">
               <span className="badge badge-success">
                 <CheckCircle2 className="w-3 h-3" />
-                {results.filter((r) => r.classification?.hsCode && r.classification.hsCode !== 'ERROR').length} classified
+                {t('upload', 'classifiedCount', { count: results.filter((r) => r.classification?.hsCode && r.classification.hsCode !== 'ERROR').length })}
               </span>
               <span className="badge badge-error">
-                {results.filter((r) => r.classification?.regulationStatus === 'REGULATED').length} regulated
+                {t('upload', 'regulatedCount', { count: results.filter((r) => r.classification?.regulationStatus === 'REGULATED').length })}
               </span>
             </div>
           </div>
@@ -366,12 +366,12 @@ export default function UploadPage() {
                 <thead>
                   <tr>
                     <th>#</th>
-                    <th>Item Name</th>
-                    <th>HS Code</th>
-                    <th>CDF</th>
-                    <th>Regulation</th>
-                    <th>ZATCA Name</th>
-                    <th>Confidence</th>
+                    <th>{t('upload', 'itemNameHeader')}</th>
+                    <th>{t('classification', 'hsCode')}</th>
+                    <th>{t('classification', 'cdf')}</th>
+                    <th>{t('upload', 'regulation')}</th>
+                    <th>{t('upload', 'zatcaName')}</th>
+                    <th>{t('classification', 'confidence')}</th>
                   </tr>
                 </thead>
                 <tbody>
@@ -392,9 +392,9 @@ export default function UploadPage() {
                       <td>
                         <span className={`badge ${regulationColors[row.classification?.regulationStatus || 'UNKNOWN'] || 'badge-muted'} text-xs`}>
                           {row.classification?.regulationStatus === 'REGULATED'
-                            ? '⚠ Regulated'
+                            ? `⚠ ${t('classification', 'regulated')}`
                             : row.classification?.regulationStatus === 'NON-REGULATED'
-                            ? '✓ Clear'
+                            ? `✓ ${t('upload', 'clear')}`
                             : '?'}
                         </span>
                       </td>
@@ -425,7 +425,7 @@ export default function UploadPage() {
 
           <div className="flex gap-3">
             <button onClick={() => { setStep('upload'); setResults([]); setRunId(null); setUploadResult(null); }} className="btn-ghost">
-              <RefreshCw className="w-4 h-4" /> Start Over
+              <RefreshCw className="w-4 h-4" /> {t('upload', 'startOver')}
             </button>
             <button
               id="export-excel-btn"
@@ -447,15 +447,15 @@ export default function UploadPage() {
           <div>
             <p className="text-lg font-semibold text-white">{t('upload', 'exportSuccess')}</p>
             <p className="text-sm text-muted mt-1">
-              Your enriched Excel file with ZATCA classifications is downloading.
+              {t('upload', 'exportDescription')}
             </p>
           </div>
           <div className="flex gap-3">
             <button onClick={() => { setStep('upload'); setResults([]); setRunId(null); setUploadResult(null); }} className="btn-ghost">
-              <Upload className="w-4 h-4" /> Upload Another Invoice
+              <Upload className="w-4 h-4" /> {t('upload', 'uploadAnother')}
             </button>
             <button onClick={handleExport} className="btn-primary">
-              <Download className="w-4 h-4" /> Download Again
+              <Download className="w-4 h-4" /> {t('upload', 'downloadAgain')}
             </button>
           </div>
         </div>

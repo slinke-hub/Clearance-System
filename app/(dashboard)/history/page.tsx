@@ -11,6 +11,7 @@ import {
   CheckCircle2,
   Upload,
 } from 'lucide-react';
+import { useI18n } from '@/lib/i18n/context';
 
 interface HistoryItem {
   id: string;
@@ -19,7 +20,7 @@ interface HistoryItem {
   classifiedRows: number;
   status: 'completed' | 'processing' | 'failed';
   date: string;
-  customsDutyTotal: string;
+  customsDutyTotal: number;
 }
 
 const SAMPLE_RUNS: HistoryItem[] = [
@@ -30,7 +31,7 @@ const SAMPLE_RUNS: HistoryItem[] = [
     classifiedRows: 48,
     status: 'completed',
     date: '2026-08-28 14:32',
-    customsDutyTotal: 'SAR 12,450.00',
+    customsDutyTotal: 12450,
   },
   {
     id: 'run-002',
@@ -39,7 +40,7 @@ const SAMPLE_RUNS: HistoryItem[] = [
     classifiedRows: 120,
     status: 'completed',
     date: '2026-08-25 09:15',
-    customsDutyTotal: 'SAR 38,900.00',
+    customsDutyTotal: 38900,
   },
   {
     id: 'run-003',
@@ -48,11 +49,12 @@ const SAMPLE_RUNS: HistoryItem[] = [
     classifiedRows: 35,
     status: 'completed',
     date: '2026-08-20 16:45',
-    customsDutyTotal: 'SAR 4,210.00',
+    customsDutyTotal: 4210,
   },
 ];
 
 export default function HistoryPage() {
+  const { t, locale } = useI18n();
   const [searchTerm, setSearchTerm] = useState('');
   const [filterStatus, setFilterStatus] = useState<string>('all');
 
@@ -62,6 +64,15 @@ export default function HistoryPage() {
     return matchesSearch && matchesStatus;
   });
 
+  const currencyFormatter = new Intl.NumberFormat(locale === 'ar' ? 'ar-SA' : 'en-SA', {
+    style: 'currency',
+    currency: 'SAR',
+  });
+  const dateFormatter = new Intl.DateTimeFormat(locale === 'ar' ? 'ar-SA' : 'en-SA', {
+    dateStyle: 'medium',
+    timeStyle: 'short',
+  });
+
   return (
     <div className="space-y-6 max-w-5xl">
       {/* Header */}
@@ -69,28 +80,28 @@ export default function HistoryPage() {
         <div>
           <h1 className="text-2xl font-bold text-white flex items-center gap-2.5">
             <History className="w-6 h-6 text-brand-teal-light" />
-            Clearance History & Audit Logs
+            {t('history', 'pageTitle')}
           </h1>
           <p className="text-muted text-sm mt-1">
-            Review past invoice processing batches, audit classifications, and re-download enriched files.
+            {t('history', 'pageSubtitle')}
           </p>
         </div>
         <Link href="/upload" className="btn-primary">
           <Upload className="w-4 h-4" />
-          Upload New Invoice
+          {t('history', 'uploadNew')}
         </Link>
       </div>
 
       {/* Filter Bar */}
       <div className="glass-card p-4 flex flex-col sm:flex-row gap-3 items-center justify-between">
         <div className="relative w-full sm:w-80">
-          <Search className="w-4 h-4 absolute left-3 top-1/2 -translate-y-1/2 text-muted" />
+          <Search className="w-4 h-4 absolute start-3 top-1/2 -translate-y-1/2 text-muted" />
           <input
             type="text"
-            placeholder="Search invoice files..."
+            placeholder={t('history', 'searchPlaceholder')}
             value={searchTerm}
             onChange={(e) => setSearchTerm(e.target.value)}
-            className="form-input pl-9 py-2 text-sm"
+            className="form-input ps-9 py-2 text-sm"
           />
         </div>
 
@@ -101,10 +112,10 @@ export default function HistoryPage() {
             onChange={(e) => setFilterStatus(e.target.value)}
             className="form-input py-2 text-sm bg-surface-overlay border-surface-border text-white"
           >
-            <option value="all">All Statuses</option>
-            <option value="completed">Completed</option>
-            <option value="processing">Processing</option>
-            <option value="failed">Failed</option>
+            <option value="all">{t('history', 'allStatuses')}</option>
+            <option value="completed">{t('history', 'completed')}</option>
+            <option value="processing">{t('history', 'processing')}</option>
+            <option value="failed">{t('history', 'failed')}</option>
           </select>
         </div>
       </div>
@@ -115,19 +126,19 @@ export default function HistoryPage() {
           <table className="data-table">
             <thead>
               <tr>
-                <th>Invoice File</th>
-                <th>Items</th>
-                <th>Status</th>
-                <th>Est. Duty</th>
-                <th>Processed Date</th>
-                <th className="text-right">Action</th>
+                <th>{t('history', 'invoiceFile')}</th>
+                <th>{t('history', 'items')}</th>
+                <th>{t('history', 'status')}</th>
+                <th>{t('history', 'estimatedDuty')}</th>
+                <th>{t('history', 'processedDate')}</th>
+                <th className="text-end">{t('history', 'action')}</th>
               </tr>
             </thead>
             <tbody>
               {filteredRuns.length === 0 ? (
                 <tr>
                   <td colSpan={6} className="text-center py-12 text-muted">
-                    No clearance history records found.
+                    {t('history', 'noRecords')}
                   </td>
                 </tr>
               ) : (
@@ -144,21 +155,21 @@ export default function HistoryPage() {
                     </td>
                     <td>
                       <span className="badge badge-success flex items-center gap-1 w-fit">
-                        <CheckCircle2 className="w-3 h-3" /> Completed
+                        <CheckCircle2 className="w-3 h-3" /> {t('history', 'completed')}
                       </span>
                     </td>
                     <td className="font-mono text-xs font-semibold text-brand-gold">
-                      {item.customsDutyTotal}
+                      {currencyFormatter.format(item.customsDutyTotal)}
                     </td>
-                    <td className="text-xs text-muted">{item.date}</td>
-                    <td className="text-right">
+                    <td className="text-xs text-muted" dir="auto">{dateFormatter.format(new Date(item.date.replace(' ', 'T')))}</td>
+                    <td className="text-end">
                       <a
                         href={`/api/export/${item.id}`}
                         download
                         className="btn-ghost py-1.5 px-3 text-xs inline-flex items-center gap-1.5"
                       >
                         <Download className="w-3.5 h-3.5" />
-                        Download
+                        {t('history', 'download')}
                       </a>
                     </td>
                   </tr>

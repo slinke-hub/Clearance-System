@@ -14,7 +14,7 @@ import {
 } from 'lucide-react';
 
 export default function ProfilePage() {
-  const { locale, setLocale } = useI18n();
+  const { t, locale, setLocale } = useI18n();
 
   const [fullName, setFullName] = useState('Admin User');
   const [email] = useState('privatepple@gmail.com');
@@ -34,14 +34,14 @@ export default function ProfilePage() {
     setIsSaving(true);
     setTimeout(() => {
       setIsSaving(false);
-      toast.success('Profile details saved successfully');
+      toast.success(t('profile', 'profileSaved'));
     }, 600);
   };
 
   const handleChangePassword = (e: React.FormEvent) => {
     e.preventDefault();
     if (!newPassword || newPassword !== confirmPassword) {
-      toast.error('Passwords do not match');
+      toast.error(t('profile', 'passwordMismatch'));
       return;
     }
     setIsChangingPassword(true);
@@ -50,7 +50,7 @@ export default function ProfilePage() {
       setCurrentPassword('');
       setNewPassword('');
       setConfirmPassword('');
-      toast.success('Password updated successfully');
+      toast.success(t('profile', 'passwordUpdated'));
     }, 600);
   };
 
@@ -60,10 +60,10 @@ export default function ProfilePage() {
       <div>
         <h1 className="text-2xl font-bold text-white flex items-center gap-2.5">
           <User className="w-6 h-6 text-brand-teal-light" />
-          User Profile & Settings
+          {t('profile', 'pageTitle')}
         </h1>
         <p className="text-muted text-sm mt-1">
-          Manage your personal account, company information, and ZATCA compliance credentials.
+          {t('profile', 'pageSubtitle')}
         </p>
       </div>
 
@@ -78,34 +78,34 @@ export default function ProfilePage() {
             <p className="text-xs text-muted mt-0.5">{email}</p>
             <div className="flex items-center gap-2 mt-3">
               <span className="px-2.5 py-0.5 rounded-full bg-brand-gold/20 text-brand-gold text-xs font-bold flex items-center gap-1">
-                <Shield className="w-3 h-3" /> ADMIN
+                <Shield className="w-3 h-3" /> {t('profile', 'admin')}
               </span>
               <span className="px-2.5 py-0.5 rounded-full bg-brand-teal/20 text-brand-teal-light text-xs font-medium">
-                Enterprise
+                {t('plans', 'enterprise')}
               </span>
             </div>
           </div>
 
           <div className="space-y-3 text-xs">
             <div className="flex items-center justify-between text-muted">
-              <span>Account Status</span>
+              <span>{t('profile', 'accountStatus')}</span>
               <span className="text-success font-medium flex items-center gap-1">
-                <CheckCircle2 className="w-3.5 h-3.5" /> Active
+                <CheckCircle2 className="w-3.5 h-3.5" /> {t('profile', 'active')}
               </span>
             </div>
             <div className="flex items-center justify-between text-muted">
-              <span>Tax Authority</span>
+              <span>{t('profile', 'taxAuthority')}</span>
               <span className="text-white font-medium">ZATCA (KSA)</span>
             </div>
             <div className="flex items-center justify-between text-muted">
-              <span>Language</span>
+              <span>{t('profile', 'language')}</span>
               <button
                 type="button"
                 onClick={() => setLocale(locale === 'en' ? 'ar' : 'en')}
                 className="text-brand-teal-light hover:text-brand-gold font-medium flex items-center gap-1 transition-colors"
               >
                 <Globe className="w-3 h-3" />
-                {locale === 'en' ? 'English (LTR)' : 'العربية (RTL)'}
+                {locale === 'en' ? t('common', 'arabic') : t('common', 'english')}
               </button>
             </div>
           </div>
@@ -117,13 +117,13 @@ export default function ProfilePage() {
           <div className="glass-card p-6">
             <h3 className="text-base font-semibold text-white mb-4 flex items-center gap-2">
               <Building2 className="w-4 h-4 text-brand-teal-light" />
-              General & Company Information
+              {t('profile', 'generalInfo')}
             </h3>
 
             <form onSubmit={handleSaveProfile} className="space-y-4">
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                 <div>
-                  <label className="form-label">Full Name</label>
+                  <label className="form-label">{t('profile', 'fullName')}</label>
                   <input
                     type="text"
                     className="form-input"
@@ -134,7 +134,7 @@ export default function ProfilePage() {
                 </div>
 
                 <div>
-                  <label className="form-label">Email Address</label>
+                  <label className="form-label">{t('auth', 'email')}</label>
                   <input
                     type="email"
                     className="form-input opacity-70 cursor-not-allowed"
@@ -144,7 +144,7 @@ export default function ProfilePage() {
                 </div>
 
                 <div>
-                  <label className="form-label">Company / Est. Name</label>
+                  <label className="form-label">{t('profile', 'companyEstName')}</label>
                   <input
                     type="text"
                     className="form-input"
@@ -154,7 +154,7 @@ export default function ProfilePage() {
                 </div>
 
                 <div>
-                  <label className="form-label">Phone Number</label>
+                  <label className="form-label">{t('auth', 'phone')}</label>
                   <input
                     type="text"
                     className="form-input"
@@ -164,7 +164,7 @@ export default function ProfilePage() {
                 </div>
 
                 <div>
-                  <label className="form-label">KSA VAT Number (الرقم الضريبي)</label>
+                  <label className="form-label">{t('profile', 'ksaVatNumber')}</label>
                   <input
                     type="text"
                     className="form-input"
@@ -175,7 +175,7 @@ export default function ProfilePage() {
                 </div>
 
                 <div>
-                  <label className="form-label">Commercial Registration (السجل التجاري)</label>
+                  <label className="form-label">{t('profile', 'commercialRegistration')}</label>
                   <input
                     type="text"
                     className="form-input"
@@ -193,7 +193,7 @@ export default function ProfilePage() {
                   className="btn-primary"
                 >
                   <Save className="w-4 h-4" />
-                  {isSaving ? 'Saving...' : 'Save Profile Changes'}
+                  {isSaving ? t('profile', 'saving') : t('profile', 'saveProfile')}
                 </button>
               </div>
             </form>
@@ -203,13 +203,13 @@ export default function ProfilePage() {
           <div className="glass-card p-6">
             <h3 className="text-base font-semibold text-white mb-4 flex items-center gap-2">
               <Lock className="w-4 h-4 text-brand-gold" />
-              Security & Password
+              {t('profile', 'security')}
             </h3>
 
             <form onSubmit={handleChangePassword} className="space-y-4">
               <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
                 <div>
-                  <label className="form-label">Current Password</label>
+                  <label className="form-label">{t('profile', 'currentPassword')}</label>
                   <input
                     type="password"
                     className="form-input"
@@ -219,7 +219,7 @@ export default function ProfilePage() {
                   />
                 </div>
                 <div>
-                  <label className="form-label">New Password</label>
+                  <label className="form-label">{t('profile', 'newPassword')}</label>
                   <input
                     type="password"
                     className="form-input"
@@ -229,7 +229,7 @@ export default function ProfilePage() {
                   />
                 </div>
                 <div>
-                  <label className="form-label">Confirm New Password</label>
+                  <label className="form-label">{t('profile', 'confirmNewPassword')}</label>
                   <input
                     type="password"
                     className="form-input"
@@ -246,7 +246,7 @@ export default function ProfilePage() {
                   disabled={isChangingPassword}
                   className="btn-ghost"
                 >
-                  {isChangingPassword ? 'Updating...' : 'Update Password'}
+                  {isChangingPassword ? t('profile', 'updating') : t('profile', 'updatePassword')}
                 </button>
               </div>
             </form>

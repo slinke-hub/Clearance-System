@@ -7,6 +7,7 @@ import {
   UserPlus,
   Trash2,
 } from 'lucide-react';
+import { useI18n } from '@/lib/i18n/context';
 
 interface TeamMember {
   id: string;
@@ -47,6 +48,7 @@ const INITIAL_MEMBERS: TeamMember[] = [
 ];
 
 export default function TeamPage() {
+  const { t, locale } = useI18n();
   const [members, setMembers] = useState<TeamMember[]>(INITIAL_MEMBERS);
   const [inviteEmail, setInviteEmail] = useState('');
   const [inviteRole, setInviteRole] = useState<InviteRole>('Customs Specialist');
@@ -69,14 +71,29 @@ export default function TeamPage() {
       setMembers([...members, newMember]);
       setInviteEmail('');
       setIsInviting(false);
-      toast.success(`Invitation sent to ${inviteEmail}`);
+      toast.success(t('team', 'invitationSent', { email: inviteEmail }));
     }, 500);
   };
 
   const handleRemove = (id: string, name: string) => {
     setMembers(members.filter((m) => m.id !== id));
-    toast.success(`Removed ${name} from organization`);
+    toast.success(t('team', 'memberRemoved', { name }));
   };
+
+  const roleLabels: Record<TeamMember['role'], string> = {
+    Owner: t('team', 'ownerRole'),
+    Admin: t('team', 'adminRole'),
+    'Customs Specialist': t('team', 'specialistRole'),
+    Auditor: t('team', 'auditorRole'),
+  };
+
+  const statusLabels: Record<TeamMember['status'], string> = {
+    Active: t('team', 'active'),
+    Pending: t('team', 'pending'),
+  };
+  const dateFormatter = new Intl.DateTimeFormat(locale === 'ar' ? 'ar-SA' : 'en-SA', {
+    dateStyle: 'medium',
+  });
 
   return (
     <div className="space-y-6 max-w-5xl">
@@ -84,10 +101,10 @@ export default function TeamPage() {
       <div>
         <h1 className="text-2xl font-bold text-white flex items-center gap-2.5">
           <Users className="w-6 h-6 text-brand-teal-light" />
-          Organization & Team Management
+          {t('team', 'pageTitle')}
         </h1>
         <p className="text-muted text-sm mt-1">
-          Invite customs brokers, compliance officers, and staff to collaborate on invoice clearances.
+          {t('team', 'pageSubtitle')}
         </p>
       </div>
 
@@ -95,14 +112,14 @@ export default function TeamPage() {
       <div className="glass-card p-6">
         <h2 className="text-base font-semibold text-white mb-4 flex items-center gap-2">
           <UserPlus className="w-4 h-4 text-brand-teal-light" />
-          Invite New Member
+          {t('team', 'inviteNew')}
         </h2>
 
         <form onSubmit={handleInvite} className="flex flex-col sm:flex-row gap-3">
           <div className="flex-1">
             <input
               type="email"
-              placeholder="colleague@company.com"
+              placeholder={t('team', 'emailPlaceholder')}
               value={inviteEmail}
               onChange={(e) => setInviteEmail(e.target.value)}
               className="form-input"
@@ -116,14 +133,14 @@ export default function TeamPage() {
               onChange={(e) => setInviteRole(e.target.value as InviteRole)}
               className="form-input bg-surface-overlay border-surface-border text-white"
             >
-              <option value="Customs Specialist">Customs Specialist</option>
-              <option value="Admin">Administrator</option>
-              <option value="Auditor">Compliance Auditor</option>
+              <option value="Customs Specialist">{t('team', 'customsSpecialist')}</option>
+              <option value="Admin">{t('team', 'administrator')}</option>
+              <option value="Auditor">{t('team', 'auditor')}</option>
             </select>
           </div>
 
           <button type="submit" disabled={isInviting} className="btn-primary shrink-0">
-            {isInviting ? 'Sending...' : 'Send Invitation'}
+            {isInviting ? t('team', 'sending') : t('team', 'sendInvitation')}
           </button>
         </form>
       </div>
@@ -132,20 +149,20 @@ export default function TeamPage() {
       <div className="glass-card overflow-hidden">
         <div className="p-4 border-b border-surface-border flex items-center justify-between">
           <h3 className="text-sm font-semibold text-white">
-            Active Organization Members ({members.length})
+            {t('team', 'activeMembers', { count: members.length })}
           </h3>
-          <span className="badge badge-info">Enterprise Plan (Unlimited Seats)</span>
+          <span className="badge badge-info">{t('team', 'enterpriseSeats')}</span>
         </div>
 
         <div className="overflow-x-auto">
           <table className="data-table">
             <thead>
               <tr>
-                <th>Member</th>
-                <th>Role</th>
-                <th>Status</th>
-                <th>Joined Date</th>
-                <th className="text-right">Actions</th>
+                <th>{t('team', 'members')}</th>
+                <th>{t('team', 'role')}</th>
+                <th>{t('team', 'status')}</th>
+                <th>{t('team', 'joinedDate')}</th>
+                <th className="text-end">{t('team', 'actions')}</th>
               </tr>
             </thead>
             <tbody>
@@ -168,24 +185,24 @@ export default function TeamPage() {
                         ? 'bg-brand-gold/20 text-brand-gold'
                         : 'bg-brand-teal/15 text-brand-teal-light'
                     } text-xs font-semibold`}>
-                      {member.role}
+                      {roleLabels[member.role]}
                     </span>
                   </td>
                   <td>
                     <span className={`badge ${
                       member.status === 'Active' ? 'badge-success' : 'badge-warning'
                     }`}>
-                      {member.status}
+                      {statusLabels[member.status]}
                     </span>
                   </td>
-                  <td className="text-xs text-muted">{member.joinedAt}</td>
-                  <td className="text-right">
+                  <td className="text-xs text-muted" dir="auto">{dateFormatter.format(new Date(`${member.joinedAt}T00:00:00`))}</td>
+                  <td className="text-end">
                     {member.role !== 'Owner' && (
                       <button
                         type="button"
                         onClick={() => handleRemove(member.id, member.name)}
                         className="p-1.5 rounded-lg text-muted hover:text-error hover:bg-error/10 transition-colors"
-                        title="Remove member"
+                        title={t('team', 'removeMember')}
                       >
                         <Trash2 className="w-4 h-4" />
                       </button>

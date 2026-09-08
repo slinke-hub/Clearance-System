@@ -10,7 +10,7 @@ type TranslationKey = keyof Translations;
 
 interface I18nContextType {
   locale: Language;
-  t: (section: TranslationKey, key: string) => string;
+  t: (section: TranslationKey, key: string, values?: Record<string, string | number>) => string;
   setLocale: (lang: Language) => void;
   isRTL: boolean;
 }
@@ -44,10 +44,19 @@ export function I18nProvider({ children }: { children: React.ReactNode }) {
     applyDirection(lang);
   };
 
-  const t = (section: TranslationKey, key: string): string => {
+  const t = (
+    section: TranslationKey,
+    key: string,
+    values: Record<string, string | number> = {},
+  ): string => {
     const dict = dictionaries[locale];
     const sectionDict = dict[section] as Record<string, string> | undefined;
-    return sectionDict?.[key] ?? `${section}.${key}`;
+    const template = sectionDict?.[key] ?? `${section}.${key}`;
+
+    return Object.entries(values).reduce(
+      (result, [name, value]) => result.replaceAll(`{${name}}`, String(value)),
+      template,
+    );
   };
 
   return (

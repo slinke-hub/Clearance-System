@@ -51,7 +51,7 @@ export function DashboardLayout({ children, userRole, userName, plan }: Dashboar
     try {
       await fetch('/api/auth/logout', { method: 'POST' });
     } catch {}
-    toast.success('Signed out successfully');
+    toast.success(t('nav', 'logoutSuccess'));
     router.push('/login');
     router.refresh();
   };
@@ -71,7 +71,7 @@ export function DashboardLayout({ children, userRole, userName, plan }: Dashboar
           </div>
           <div>
             <p className="text-sm font-bold text-white">{t('common', 'appName')}</p>
-            <p className="text-xs text-muted">KSA Customs</p>
+            <p className="text-xs text-muted">{t('common', 'ksaCustoms')}</p>
           </div>
         </div>
       </div>
@@ -90,7 +90,7 @@ export function DashboardLayout({ children, userRole, userName, plan }: Dashboar
             >
               <Icon className="w-4 h-4 shrink-0" />
               <span className="flex-1">{t('nav', item.labelKey)}</span>
-              {isActive && <ChevronRight className="w-3.5 h-3.5" />}
+              {isActive && <ChevronRight className={`w-3.5 h-3.5 ${isRTL ? 'rotate-180' : ''}`} />}
             </Link>
           );
         })}
@@ -101,12 +101,12 @@ export function DashboardLayout({ children, userRole, userName, plan }: Dashboar
         {/* Plan badge */}
         {plan && (
           <div className="px-4 py-2 rounded-xl bg-surface-overlay flex items-center justify-between mb-1">
-            <span className="text-xs text-muted">Plan</span>
+            <span className="text-xs text-muted">{t('common', 'plan')}</span>
             <span className={`text-xs font-semibold capitalize ${
               plan === 'enterprise' ? 'text-brand-gold' :
               plan === 'pro' ? 'text-info' : 'text-muted'
             }`}>
-              {plan === 'free' ? 'Free Trial' : plan.charAt(0).toUpperCase() + plan.slice(1)}
+              {t('plans', plan === 'free' || plan === 'pro' || plan === 'enterprise' ? plan : 'free')}
             </span>
           </div>
         )}
@@ -118,13 +118,13 @@ export function DashboardLayout({ children, userRole, userName, plan }: Dashboar
           className="nav-link w-full"
         >
           <Globe className="w-4 h-4 shrink-0" />
-          <span className="flex-1">{locale === 'en' ? 'العربية' : 'English'}</span>
+          <span className="flex-1">{locale === 'en' ? t('common', 'arabic') : t('common', 'english')}</span>
         </button>
 
         {/* User info */}
         <div className="px-4 py-2.5 rounded-xl bg-surface-overlay">
-          <p className="text-xs text-muted truncate">Signed in as</p>
-          <p className="text-sm font-medium text-white truncate">{userName || 'User'}</p>
+          <p className="text-xs text-muted truncate">{t('common', 'signedInAs')}</p>
+          <p className="text-sm font-medium text-white truncate">{userName || t('common', 'user')}</p>
         </div>
 
         {/* Logout */}
@@ -143,7 +143,7 @@ export function DashboardLayout({ children, userRole, userName, plan }: Dashboar
   return (
     <div className={`flex h-screen overflow-hidden bg-[#0D1117] ${isRTL ? 'rtl' : 'ltr'}`}>
       {/* Desktop Sidebar */}
-      <aside className="hidden md:flex w-60 shrink-0 flex-col border-r border-surface-border bg-surface/80 backdrop-blur-glass">
+      <aside className="hidden md:flex w-60 shrink-0 flex-col border-e border-surface-border bg-surface/80 backdrop-blur-glass">
         {renderSidebarContent()}
       </aside>
 
@@ -154,7 +154,7 @@ export function DashboardLayout({ children, userRole, userName, plan }: Dashboar
             className="absolute inset-0 bg-black/60 backdrop-blur-sm"
             onClick={() => setSidebarOpen(false)}
           />
-          <aside className="absolute inset-y-0 left-0 w-60 bg-surface border-r border-surface-border flex flex-col animate-slide-in-right">
+          <aside className={`absolute inset-y-0 ${isRTL ? 'right-0' : 'left-0'} w-60 bg-surface border-e border-surface-border flex flex-col animate-slide-in-right`}>
             {renderSidebarContent()}
           </aside>
         </div>

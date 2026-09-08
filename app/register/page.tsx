@@ -9,6 +9,7 @@ import {
   Building2,
   Eye,
   EyeOff,
+  Globe,
   Loader2,
   ShieldCheck,
   Ship,
@@ -92,7 +93,7 @@ function RegistrationField({
 }
 
 export default function RegisterPage() {
-  const { t } = useI18n();
+  const { t, locale, setLocale } = useI18n();
   const router = useRouter();
   const [formData, setFormData] = useState<RegistrationFormData>(initialFormData);
   const [businessType, setBusinessType] = useState<ClearanceBusinessType>('customs_broker');
@@ -129,13 +130,13 @@ export default function RegisterPage() {
       });
       const data = await response.json();
 
-      if (!response.ok) throw new Error(data.error || 'Registration failed');
+      if (!response.ok) throw new Error(t('auth', 'registrationFailed'));
 
-      toast.success(data.message || t('auth', 'registrationSuccess'));
+      toast.success(t('auth', 'registrationSuccess'));
       router.replace(data.requiresEmailConfirmation ? '/login' : '/dashboard');
       router.refresh();
     } catch (error: unknown) {
-      toast.error(error instanceof Error ? error.message : 'Registration failed');
+      toast.error(error instanceof Error ? error.message : t('auth', 'registrationFailed'));
     } finally {
       setLoading(false);
     }
@@ -143,6 +144,16 @@ export default function RegisterPage() {
 
   return (
     <main className="min-h-screen bg-hero-gradient flex items-center justify-center p-4 py-10">
+      <button
+        type="button"
+        onClick={() => setLocale(locale === 'en' ? 'ar' : 'en')}
+        className="absolute top-4 end-4 z-20 btn-ghost px-3 py-2 text-xs"
+        aria-label={t('common', 'switchLanguage')}
+      >
+        <Globe className="w-4 h-4" />
+        {locale === 'en' ? t('common', 'arabic') : t('common', 'english')}
+      </button>
+
       <div className="absolute inset-0 overflow-hidden pointer-events-none">
         <div className="absolute top-1/4 right-1/4 w-96 h-96 bg-brand-teal/10 rounded-full blur-3xl" />
         <div className="absolute bottom-1/4 left-1/4 w-72 h-72 bg-brand-gold/10 rounded-full blur-3xl" />
@@ -200,7 +211,7 @@ export default function RegisterPage() {
                   id="fullName"
                   label={t('auth', 'fullName')}
                   type="text"
-                  placeholder="Mohammed Al-Rashidi"
+                  placeholder={t('auth', 'fullNamePlaceholder')}
                   value={formData.fullName}
                   onChange={(event) => handleChange('fullName', event.target.value)}
                   autoComplete="name"
@@ -220,7 +231,7 @@ export default function RegisterPage() {
                   id="email"
                   label={t('auth', 'email')}
                   type="email"
-                  placeholder="you@company.com"
+                  placeholder={t('auth', 'emailPlaceholder')}
                   value={formData.email}
                   onChange={(event) => handleChange('email', event.target.value)}
                   autoComplete="email"
@@ -242,7 +253,7 @@ export default function RegisterPage() {
                     />
                     <button
                       type="button"
-                      aria-label={showPassword ? 'Hide password' : 'Show password'}
+                      aria-label={showPassword ? t('auth', 'hidePassword') : t('auth', 'showPassword')}
                       onClick={() => setShowPassword((visible) => !visible)}
                       className="absolute end-3 top-1/2 -translate-y-1/2 text-muted hover:text-white transition-colors"
                     >
@@ -374,7 +385,7 @@ export default function RegisterPage() {
                     label={t('auth', 'monthlyVolume')}
                     optionalLabel={t('auth', 'optional')}
                     type="text"
-                    placeholder="1–10, 11–50, 51–200, 200+"
+                    placeholder={t('auth', 'monthlyVolumePlaceholder')}
                     value={formData.monthlyVolume}
                     onChange={(event) => handleChange('monthlyVolume', event.target.value)}
                   />
@@ -407,7 +418,7 @@ export default function RegisterPage() {
         </div>
 
         <p className="text-center text-xs text-muted/60 mt-6">
-          🇸🇦 Free trial includes 5 invoices per month — no credit card required
+          🇸🇦 {t('auth', 'freeTrialNote')}
         </p>
       </div>
     </main>

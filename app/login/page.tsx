@@ -5,10 +5,10 @@ import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { useI18n } from '@/lib/i18n/context';
 import { toast } from 'sonner';
-import { Eye, EyeOff, Loader2, ShieldCheck } from 'lucide-react';
+import { Eye, EyeOff, Globe, Loader2, ShieldCheck } from 'lucide-react';
 
 export default function LoginPage() {
-  const { t } = useI18n();
+  const { t, locale, setLocale } = useI18n();
   const router = useRouter();
   const [email, setEmail] = useState('privatepple@gmail.com');
   const [password, setPassword] = useState('0912577754');
@@ -25,13 +25,13 @@ export default function LoginPage() {
         body: JSON.stringify({ email, password }),
       });
       const data = await res.json();
-      if (!res.ok) throw new Error(data.error || 'Login failed');
+      if (!res.ok) throw new Error(t('auth', 'loginFailed'));
 
-      toast.success(data.user?.role === 'admin' ? 'Welcome, Administrator!' : 'Welcome back!');
+      toast.success(data.user?.role === 'admin' ? t('auth', 'welcomeAdmin') : t('auth', 'welcomeBack'));
       router.push('/dashboard');
       router.refresh();
     } catch (err: unknown) {
-      const message = err instanceof Error ? err.message : 'Login failed';
+      const message = err instanceof Error ? err.message : t('auth', 'loginFailed');
       toast.error(message);
     } finally {
       setLoading(false);
@@ -40,6 +40,16 @@ export default function LoginPage() {
 
   return (
     <div className="min-h-screen bg-hero-gradient flex items-center justify-center p-4">
+      <button
+        type="button"
+        onClick={() => setLocale(locale === 'en' ? 'ar' : 'en')}
+        className="absolute top-4 end-4 z-20 btn-ghost px-3 py-2 text-xs"
+        aria-label={t('common', 'switchLanguage')}
+      >
+        <Globe className="w-4 h-4" />
+        {locale === 'en' ? t('common', 'arabic') : t('common', 'english')}
+      </button>
+
       {/* Background decoration */}
       <div className="absolute inset-0 overflow-hidden pointer-events-none">
         <div className="absolute top-1/4 left-1/4 w-96 h-96 bg-brand-teal/10 rounded-full blur-3xl" />
@@ -64,11 +74,11 @@ export default function LoginPage() {
           {/* Admin badge */}
           <div className="mb-5 p-3 rounded-xl bg-brand-teal/10 border border-brand-teal/30 flex items-center justify-between text-xs">
             <div>
-              <p className="font-semibold text-brand-teal-light">👑 Administrator Account Ready</p>
+              <p className="font-semibold text-brand-teal-light">👑 {t('auth', 'adminAccountReady')}</p>
               <p className="text-muted">privatepple@gmail.com</p>
             </div>
             <span className="px-2 py-0.5 rounded-full bg-brand-gold/20 text-brand-gold text-[10px] font-bold">
-              ADMIN
+              {t('auth', 'adminBadge')}
             </span>
           </div>
 
@@ -79,7 +89,7 @@ export default function LoginPage() {
                 id="login-email"
                 type="email"
                 className="form-input"
-                placeholder="you@company.com"
+                placeholder={t('auth', 'emailPlaceholder')}
                 value={email}
                 onChange={(e) => setEmail(e.target.value)}
                 required
@@ -93,7 +103,7 @@ export default function LoginPage() {
                 <input
                   id="login-password"
                   type={showPassword ? 'text' : 'password'}
-                  className="form-input pr-10"
+                  className="form-input pe-10"
                   placeholder="••••••••"
                   value={password}
                   onChange={(e) => setPassword(e.target.value)}
@@ -103,7 +113,8 @@ export default function LoginPage() {
                 <button
                   type="button"
                   onClick={() => setShowPassword(!showPassword)}
-                  className="absolute right-3 top-1/2 -translate-y-1/2 text-muted hover:text-white transition-colors"
+                  aria-label={showPassword ? t('auth', 'hidePassword') : t('auth', 'showPassword')}
+                  className="absolute end-3 top-1/2 -translate-y-1/2 text-muted hover:text-white transition-colors"
                 >
                   {showPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
                 </button>
@@ -140,7 +151,7 @@ export default function LoginPage() {
 
         {/* KSA Badge */}
         <p className="text-center text-xs text-muted/60 mt-6">
-          🇸🇦 Compliant with ZATCA regulations & KSA Customs tariff schedule
+          🇸🇦 {t('auth', 'ksaCompliance')}
         </p>
       </div>
     </div>

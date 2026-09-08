@@ -10,8 +10,10 @@ import {
   Sliders,
   Layers,
 } from 'lucide-react';
+import { useI18n } from '@/lib/i18n/context';
 
 export default function AdminControlPage() {
+  const { t } = useI18n();
   const [isSyncingTariff, setIsSyncingTariff] = useState(false);
   const [minConfidenceThreshold, setMinConfidenceThreshold] = useState(85);
   const [saberAutoFlag, setSaberAutoFlag] = useState(true);
@@ -21,13 +23,13 @@ export default function AdminControlPage() {
     setIsSyncingTariff(true);
     setTimeout(() => {
       setIsSyncingTariff(false);
-      toast.success('ZATCA & KSA Customs 12-digit Tariff Database updated (Q3 2026)');
+      toast.success(t('admin', 'tariffUpdated'));
     }, 1200);
   };
 
   const handleSaveSettings = (e: React.FormEvent) => {
     e.preventDefault();
-    toast.success('System configuration & classification thresholds updated');
+    toast.success(t('admin', 'settingsUpdated'));
   };
 
   return (
@@ -36,10 +38,10 @@ export default function AdminControlPage() {
       <div>
         <h1 className="text-2xl font-bold text-white flex items-center gap-2.5">
           <ShieldCheck className="w-6 h-6 text-brand-gold" />
-          Master Administration & System Control
+          {t('admin', 'pageTitle')}
         </h1>
         <p className="text-muted text-sm mt-1">
-          Monitor system services, manage the KSA Customs Integrated Tariff schedule, and adjust AI classification rules.
+          {t('admin', 'pageSubtitle')}
         </p>
       </div>
 
@@ -53,12 +55,12 @@ export default function AdminControlPage() {
               </div>
               <div>
                 <p className="text-sm font-bold text-white">Supabase PostgreSQL</p>
-                <p className="text-xs text-muted">Cloud DB & Auth</p>
+                <p className="text-xs text-muted">{t('admin', 'cloudDbAuth')}</p>
               </div>
             </div>
-            <span className="badge badge-success">Connected</span>
+            <span className="badge badge-success">{t('admin', 'connected')}</span>
           </div>
-          <p className="text-xs text-muted/80">Project: hapwbspbqsskkwrfkysv</p>
+          <p className="text-xs text-muted/80">{t('admin', 'project')}: hapwbspbqsskkwrfkysv</p>
         </div>
 
         <div className="glass-card p-5">
@@ -72,9 +74,9 @@ export default function AdminControlPage() {
                 <p className="text-xs text-muted">Llama-3.1-Nemotron-70B</p>
               </div>
             </div>
-            <span className="badge badge-success">Active</span>
+            <span className="badge badge-success">{t('admin', 'active')}</span>
           </div>
-          <p className="text-xs text-muted/80">Latency: ~420ms / batch</p>
+          <p className="text-xs text-muted/80">{t('admin', 'latency')}</p>
         </div>
 
         <div className="glass-card p-5">
@@ -84,13 +86,13 @@ export default function AdminControlPage() {
                 <Layers className="w-5 h-5 text-brand-gold" />
               </div>
               <div>
-                <p className="text-sm font-bold text-white">ZATCA Tariff Index</p>
-                <p className="text-xs text-muted">Integrated HS Schedule</p>
+                <p className="text-sm font-bold text-white">{t('admin', 'tariffIndex')}</p>
+                <p className="text-xs text-muted">{t('admin', 'integratedSchedule')}</p>
               </div>
             </div>
             <span className="badge bg-brand-gold/20 text-brand-gold text-xs">v2026.3</span>
           </div>
-          <p className="text-xs text-muted/80">9,842 HS-12 Taxonomies</p>
+          <p className="text-xs text-muted/80">{t('admin', 'taxonomies')}</p>
         </div>
       </div>
 
@@ -99,10 +101,10 @@ export default function AdminControlPage() {
         <div>
           <h2 className="text-base font-semibold text-white flex items-center gap-2">
             <RefreshCw className={`w-4 h-4 text-brand-teal-light ${isSyncingTariff ? 'animate-spin' : ''}`} />
-            KSA Customs & ZATCA Tariff Sync
+            {t('admin', 'tariffSync')}
           </h2>
           <p className="text-xs text-muted mt-1 max-w-xl">
-            Pull the latest Harmonized System duty rate adjustments, SFDA mandatory registration flags, and SASO Saber requirements directly from the official authority index.
+            {t('admin', 'tariffSyncDescription')}
           </p>
         </div>
         <button
@@ -112,7 +114,7 @@ export default function AdminControlPage() {
           className="btn-primary shrink-0"
         >
           <RefreshCw className={`w-4 h-4 ${isSyncingTariff ? 'animate-spin' : ''}`} />
-          {isSyncingTariff ? 'Syncing...' : 'Sync Tariff Rules'}
+          {isSyncingTariff ? t('admin', 'syncing') : t('admin', 'syncTariff')}
         </button>
       </div>
 
@@ -120,14 +122,14 @@ export default function AdminControlPage() {
       <div className="glass-card p-6">
         <h2 className="text-base font-semibold text-white mb-4 flex items-center gap-2">
           <Sliders className="w-4 h-4 text-brand-gold" />
-          AI Classification Guardrails & Thresholds
+          {t('admin', 'guardrails')}
         </h2>
 
         <form onSubmit={handleSaveSettings} className="space-y-6">
           <div>
             <div className="flex justify-between items-center mb-2">
               <label className="text-sm font-medium text-white">
-                Minimum High-Confidence Threshold: <span className="text-brand-gold font-bold">{minConfidenceThreshold}%</span>
+                {t('admin', 'minimumConfidence')}: <span className="text-brand-gold font-bold">{minConfidenceThreshold}%</span>
               </label>
             </div>
             <input
@@ -139,7 +141,7 @@ export default function AdminControlPage() {
               className="w-full accent-brand-teal"
             />
             <p className="text-xs text-muted mt-1">
-              Classifications scoring below this percentage will be marked for mandatory human specialist review.
+              {t('admin', 'confidenceHelp')}
             </p>
           </div>
 
@@ -154,10 +156,10 @@ export default function AdminControlPage() {
               />
               <div>
                 <label htmlFor="saber-toggle" className="text-sm font-semibold text-white cursor-pointer">
-                  SASO Saber Auto-Flagging
+                  {t('admin', 'saberFlagging')}
                 </label>
                 <p className="text-xs text-muted mt-0.5">
-                  Automatically tag electronic, mechanical, and regulated products with Saber Certificate of Conformity alerts.
+                  {t('admin', 'saberDescription')}
                 </p>
               </div>
             </div>
@@ -172,10 +174,10 @@ export default function AdminControlPage() {
               />
               <div>
                 <label htmlFor="sfda-toggle" className="text-sm font-semibold text-white cursor-pointer">
-                  SFDA Medical & Food Regulation Warning
+                  {t('admin', 'sfdaWarning')}
                 </label>
                 <p className="text-xs text-muted mt-0.5">
-                  Identify pharmaceuticals, cosmetics, and food items requiring Saudi Food & Drug Authority clearance licenses.
+                  {t('admin', 'sfdaDescription')}
                 </p>
               </div>
             </div>
@@ -183,7 +185,7 @@ export default function AdminControlPage() {
 
           <div className="flex justify-end pt-2">
             <button type="submit" className="btn-primary">
-              Save Guardrail Settings
+              {t('admin', 'saveGuardrails')}
             </button>
           </div>
         </form>
