@@ -1,7 +1,11 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createClient } from '@/lib/supabase/server';
 import { getCurrentUser } from '@/lib/auth/session';
-import { classifyItemsBatch, type ClassifyItemInput } from '@/lib/ai/nvidia-nim-classifier';
+import {
+  classifyItemsBatch,
+  isNvidiaNimConfigured,
+  type ClassifyItemInput,
+} from '@/lib/ai/nvidia-nim-classifier';
 import { mockStore } from '@/lib/mock/store';
 
 export const maxDuration = 60;
@@ -19,6 +23,13 @@ export async function POST(req: NextRequest) {
 
     if (!runId || !items || !Array.isArray(items) || items.length === 0) {
       return NextResponse.json({ error: 'Missing runId or items' }, { status: 400 });
+    }
+
+    if (!isNvidiaNimConfigured()) {
+      return NextResponse.json(
+        { error: 'AI classification is not configured for this deployment.' },
+        { status: 503 }
+      );
     }
 
     // Check subscription limits if not admin/enterprise

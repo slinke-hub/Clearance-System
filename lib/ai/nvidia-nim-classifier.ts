@@ -1,12 +1,28 @@
 import OpenAI from 'openai';
 import type { ZatcaClassification } from '@/types';
 
-const client = new OpenAI({
-  apiKey: process.env.NVIDIA_NIM_API_KEY,
-  baseURL: process.env.NVIDIA_NIM_BASE_URL || 'https://integrate.api.nvidia.com/v1',
-});
-
 const MODEL = process.env.NVIDIA_NIM_MODEL || 'moonshotai/kimi-k3';
+
+let client: OpenAI | undefined;
+
+export function isNvidiaNimConfigured(): boolean {
+  return Boolean(process.env.NVIDIA_NIM_API_KEY?.trim());
+}
+
+function getClient(): OpenAI {
+  const apiKey = process.env.NVIDIA_NIM_API_KEY?.trim();
+
+  if (!apiKey) {
+    throw new Error('NVIDIA_NIM_API_KEY is not configured');
+  }
+
+  client ??= new OpenAI({
+    apiKey,
+    baseURL: process.env.NVIDIA_NIM_BASE_URL || 'https://integrate.api.nvidia.com/v1',
+  });
+
+  return client;
+}
 
 const SYSTEM_PROMPT = `You are an expert KSA Customs and ZATCA (Zakat, Tax and Customs Authority) compliance classifier with deep knowledge of:
 - Saudi Arabia's Harmonized System (HS) Code taxonomy (8-12 digit GCC/KSA codes)
@@ -45,7 +61,7 @@ ${input.itemDescription ? `Item Description: ${input.itemDescription}` : ''}
 
 Return ONLY the JSON classification object.`;
 
-  const completion = await client.chat.completions.create({
+  const completion = await getClient().chat.completions.create({
     model: MODEL,
     messages: [
       { role: 'system', content: SYSTEM_PROMPT },
