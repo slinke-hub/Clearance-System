@@ -147,6 +147,7 @@ export interface ZatcaClassification {
   regulationStatus: RegulationStatus;
   standardizedZatcaName: string;
   confidenceScore?: number;
+  tariffEvidence?: import('@/lib/zatca/tariff').TariffEvidence;
 }
 
 // ── Audit Log ────────────────────────────────────────────────

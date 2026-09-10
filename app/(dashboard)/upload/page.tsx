@@ -1,10 +1,12 @@
 'use client';
 
-import React, { useState, useCallback } from 'react';
+import React, { useState } from 'react';
 import { useDropzone } from 'react-dropzone';
 import { toast } from 'sonner';
 import { useI18n } from '@/lib/i18n/context';
 import type { ColumnMapping, ZatcaClassification } from '@/types';
+import type { ParsedExcelRow } from '@/types';
+import { mapItems, reviewInvoice, type InvoiceMetadata, type ReviewItem } from '@/lib/excel/invoice';
 import {
   Upload,
   FileSpreadsheet,
@@ -27,6 +29,8 @@ interface UploadResult {
   totalRows: number;
   autoMapping: Partial<ColumnMapping>;
   preview: Record<string, unknown>[];
+  rows: ParsedExcelRow[];
+  metadata: InvoiceMetadata;
   items: Array<{
     rowIndex: number;
     itemName: string;
@@ -51,6 +55,17 @@ const STEPS: { id: Step; labelKey: string }[] = [
 
 export default function UploadPage() {
   const { t, isRTL } = useI18n();
+  const fieldLabels: Record<string, [string, string]> = {
+    invoiceNumber: ['Invoice number', 'رقم الفاتورة'], date: ['Invoice date', 'تاريخ الفاتورة'],
+    supplier: ['Supplier', 'المورد'], customer: ['Customer', 'العميل'], vessel: ['Vessel', 'السفينة'],
+    sailingDate: ['Sailing date', 'تاريخ الإبحار'], shipment: ['Shipment', 'الشحنة'], terms: ['Shipment terms', 'شروط الشحن'],
+    payment: ['Payment terms', 'شروط الدفع'], originStatement: ['Origin statement', 'بيان المنشأ'],
+    goodsTotal: ['Invoice goods total', 'قيمة البضاعة بالفاتورة'], invoiceTotal: ['Invoice total', 'إجمالي الفاتورة'],
+    itemName: ['Description', 'الوصف'], itemDescription: ['References and details', 'المراجع والتفاصيل'],
+    itemCode: ['Item code', 'رمز الصنف'], unit: ['Unit', 'الوحدة'], quantity: ['Quantity', 'الكمية'],
+    unitPrice: ['Unit price', 'سعر الوحدة'], totalPrice: ['Amount', 'المبلغ'], currency: ['Currency', 'العملة'],
+  };
+  const fieldLabel = (key: string) => fieldLabels[key]?.[isRTL ? 1 : 0] || key;
   const [step, setStep] = useState<Step>('upload');
   const [uploadResult, setUploadResult] = useState<UploadResult | null>(null);
   const [mapping, setMapping] = useState<Partial<ColumnMapping>>({});
@@ -58,9 +73,13 @@ export default function UploadPage() {
   const [classifyProgress, setClassifyProgress] = useState(0);
   const [results, setResults] = useState<ClassificationRow[]>([]);
   const [runId, setRunId] = useState<string | null>(null);
+  const [edits, setEdits] = useState<Record<number, Partial<ReviewItem>>>({});
+  const [isSaving, setIsSaving] = useState(false);
+  const reviewedItems = uploadResult ? mapItems(uploadResult.rows, mapping).map(i => ({ ...i, ...edits[i.rowIndex] })) : [];
+  const invoiceReview = reviewInvoice(reviewedItems, uploadResult?.metadata || { charges: [] });
 
   // ── Dropzone ──────────────────────────────────────────────
-  const onDrop = useCallback(async (acceptedFiles: File[]) => {
+  const onDrop = async (acceptedFiles: File[]) => {
     const file = acceptedFiles[0];
     if (!file) return;
 
@@ -72,9 +91,11 @@ export default function UploadPage() {
       const res = await fetch('/api/invoices/upload', { method: 'POST', body: formData });
       const data = await res.json();
 
-      if (!res.ok) throw new Error(t('upload', 'uploadFailed'));
+      if (!res.ok) throw new Error(data.error || t('upload', 'uploadFailed'));
 
       setUploadResult(data);
+      setEdits({});
+      setResults([]);
       setMapping(data.autoMapping || {});
       setRunId(data.runId);
       toast.success(t('upload', 'parsedRows', { count: data.totalRows, file: data.fileName }));
@@ -84,7 +105,7 @@ export default function UploadPage() {
     } finally {
       setIsUploading(false);
     }
-  }, [t]);
+  };
 
   const { getRootProps, getInputProps, isDragActive } = useDropzone({
     onDrop,
@@ -97,6 +118,12 @@ export default function UploadPage() {
   });
 
   // ── Classify ───────────────────────────────────────────────
+  const saveReview = async () => {
+    const response = await fetch('/api/invoices/review', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ runId, mapping, items: reviewedItems }) });
+    const result = await response.json();
+    if (!response.ok) throw new Error(result.error || 'Could not save invoice');
+  };
+
   const handleClassify = async () => {
     if (!runId || !uploadResult || !mapping.itemName) {
       toast.error(t('upload', 'itemNameRequired'));
@@ -107,26 +134,21 @@ export default function UploadPage() {
     setStep('classify');
 
     try {
-      const items = uploadResult.preview.length > 0
-        ? Array.from({ length: uploadResult.totalRows }, (_, i) => ({
-            rowIndex: i,
-            itemName: String(uploadResult.preview[i]?.[mapping.itemName!] || t('upload', 'itemFallback', { count: i + 1 })),
-            itemDescription: mapping.itemDescription
-              ? String(uploadResult.preview[i]?.[mapping.itemDescription] || '')
-              : '',
-          }))
-        : [];
-
-      const classifyItems = uploadResult.items?.length > 0 ? uploadResult.items : items;
-
-      const res = await fetch('/api/classify', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ runId, items: classifyItems }),
-      });
-
-      const data = await res.json();
-      if (!res.ok) throw new Error(t('upload', 'classificationFailed'));
+      if (invoiceReview.errors.length) throw new Error(invoiceReview.errors.join(' '));
+      await saveReview();
+      const classifyItems = reviewedItems;
+      const classifications: ZatcaClassification[] = [];
+      for (let offset = 0; offset < classifyItems.length; offset += 5) {
+        const res = await fetch('/api/classify', {
+          method: 'POST', headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ runId, batchRows: classifyItems.slice(offset, offset + 5).map(i => i.rowIndex) }),
+        });
+        const response = await res.json();
+        if (!res.ok) throw new Error(response.error || t('upload', 'classificationFailed'));
+        classifications.push(...response.classifications);
+        setClassifyProgress(Math.round(classifications.length / classifyItems.length * 100));
+      }
+      const data = { classifications };
 
       setClassifyProgress(100);
 
@@ -149,17 +171,23 @@ export default function UploadPage() {
   };
 
   // ── Export ─────────────────────────────────────────────────
-  const handleExport = () => {
+  const handleExport = async () => {
     if (!runId) return;
+    try {
     const url = `/api/export/${runId}`;
+    const response = await fetch(url);
+    if (!response.ok) throw new Error((await response.json()).error || 'Export failed');
+    const downloadUrl = URL.createObjectURL(await response.blob());
     const a = document.createElement('a');
-    a.href = url;
-    a.download = '';
+    a.href = downloadUrl;
+    a.download = `ClearanceIQ_${uploadResult?.fileName || 'Invoice.xlsx'}`;
     document.body.appendChild(a);
     a.click();
     document.body.removeChild(a);
+    URL.revokeObjectURL(downloadUrl);
     toast.success(t('upload', 'exportStarted'));
     setStep('export');
+    } catch (err) { toast.error(err instanceof Error ? err.message : 'Export failed'); }
   };
 
   const currentStepIndex = STEPS.findIndex((s) => s.id === step);
@@ -182,7 +210,7 @@ export default function UploadPage() {
         <div className="flex items-center gap-2 overflow-x-auto">
           {STEPS.map((s, idx) => {
             const isActive = s.id === step;
-            const isComplete = idx < currentStepIndex;
+            const isComplete = idx < currentStepIndex && (results.length > 0 || (s.id !== 'classify' && s.id !== 'review'));
             return (
               <React.Fragment key={s.id}>
                 <div className={`flex items-center gap-2 shrink-0 px-3 py-2 rounded-xl transition-all ${
@@ -241,7 +269,7 @@ export default function UploadPage() {
         <div className="glass-card p-6 space-y-5">
           <div className="flex items-center justify-between">
             <div>
-              <h2 className="text-base font-semibold text-white">{t('upload', 'mapColumns')}</h2>
+              <h2 className="text-base font-semibold text-white">{isRTL ? 'مراجعة الفاتورة والأصناف' : 'Review invoice and items'}</h2>
               <p className="text-xs text-muted mt-0.5">{t('upload', 'mapSubtitle')}</p>
             </div>
             <div className="badge badge-success">
@@ -270,7 +298,7 @@ export default function UploadPage() {
               { field: 'currency', label: t('upload', 'currency'), required: false },
             ].map(({ field, label, required }) => (
               <div key={field}>
-                <label className="form-label">
+                <label className="form-label" htmlFor={`map-${field}`}>
                   {label} {required && <span className="text-error">*</span>}
                   {!required && <span className="text-muted/60 ms-1">{t('upload', 'optional')}</span>}
                 </label>
@@ -279,7 +307,7 @@ export default function UploadPage() {
                   className="form-input"
                   value={mapping[field as keyof ColumnMapping] || ''}
                   onChange={(e) =>
-                    setMapping((prev) => ({ ...prev, [field]: e.target.value || undefined }))
+                    { setMapping((prev) => ({ ...prev, [field]: e.target.value || undefined })); setEdits({}); }
                   }
                 >
                   <option value="">— {t('upload', 'selectColumn')} —</option>
@@ -289,6 +317,24 @@ export default function UploadPage() {
                 </select>
               </div>
             ))}
+          </div>
+
+          <div className="space-y-3 text-sm">
+            <div className="grid sm:grid-cols-2 gap-2 rounded-xl bg-surface-overlay p-4">
+              {Object.entries(uploadResult.metadata).filter(([key, value]) => key !== 'charges' && value !== undefined).map(([key, value]) => <p key={key} className="break-words"><span className="text-muted">{fieldLabel(key)}: </span>{typeof value === 'number' ? value.toLocaleString(undefined, { minimumFractionDigits: 2 }) : String(value)}</p>)}
+              {uploadResult.metadata.charges.map((c, index) => <p key={index}>{c.label}: {c.amount.toLocaleString(undefined, { minimumFractionDigits: 2 })} {uploadResult.metadata.currency}</p>)}
+              <p>{isRTL ? 'الأصناف' : 'Items'}: {reviewedItems.length}</p>
+              <p>{isRTL ? 'الكميات حسب الوحدة' : 'Quantities by unit'}: {Object.entries(invoiceReview.units).map(([unit, count]) => `${count.toLocaleString()} ${unit}`).join(' / ')}</p>
+              <p>{isRTL ? 'إجمالي الأصناف المحسوب' : 'Calculated goods total'}: {invoiceReview.goodsTotal?.toLocaleString(undefined, { minimumFractionDigits: 2 }) ?? '—'}</p>
+              <p>{isRTL ? 'الإجمالي مع الرسوم' : 'Total including charges'}: {invoiceReview.total?.toLocaleString(undefined, { minimumFractionDigits: 2 }) ?? '—'}</p>
+            </div>
+            {[...invoiceReview.errors, ...invoiceReview.warnings].map((message, index) => <p key={index} role="status" className="text-warning">{message}</p>)}
+            <p className="text-muted">{isRTL ? 'راجع جميع الأصناف وعدّل البيانات قبل التصنيف.' : 'Review all items and correct any details before classification. Row numbers refer to the original Excel sheet.'}</p>
+            <div className="overflow-auto max-h-[480px]">
+              <table className="data-table"><thead><tr><th>{isRTL ? 'الصف' : 'Row'}</th>{(['itemName', 'itemDescription', 'itemCode', 'unit', 'quantity', 'unitPrice', 'totalPrice', 'currency'] as const).map(key => <th key={key}>{fieldLabel(key)}</th>)}</tr></thead>
+                <tbody>{reviewedItems.map(item => <tr key={item.rowIndex}><td>{item.rowIndex + 1}</td>{(['itemName', 'itemDescription', 'itemCode', 'unit', 'quantity', 'unitPrice', 'totalPrice', 'currency'] as const).map(key => <td key={key}><input className={`form-input ${key === 'itemName' || key === 'itemDescription' ? 'min-w-72' : 'min-w-32'}`} aria-label={`${fieldLabel(key)} row ${item.rowIndex + 1}`} value={item[key]} onChange={event => setEdits(prev => ({ ...prev, [item.rowIndex]: { ...prev[item.rowIndex], [key]: event.target.value } }))} /></td>)}</tr>)}</tbody>
+              </table>
+            </div>
           </div>
 
           {!mapping.itemName && (
@@ -302,10 +348,16 @@ export default function UploadPage() {
             <button onClick={() => setStep('upload')} className="btn-ghost">
               {isRTL ? '→' : '←'} {t('upload', 'back')}
             </button>
+            <button className="btn-ghost" disabled={isSaving || invoiceReview.errors.length > 0} onClick={async () => {
+              setIsSaving(true);
+              try { await saveReview(); await handleExport(); }
+              catch (err) { toast.error(err instanceof Error ? err.message : 'Could not save invoice'); }
+              finally { setIsSaving(false); }
+            }}>{isSaving ? '…' : isRTL ? 'حفظ وتصدير الأصناف' : 'Save and export items'}</button>
             <button
               id="start-classify-btn"
               onClick={handleClassify}
-              disabled={!mapping.itemName}
+              disabled={isSaving || !mapping.itemName || invoiceReview.errors.length > 0}
               className="btn-primary flex-1"
             >
               <Sparkles className="w-4 h-4" /> {t('upload', 'startClassification')}
@@ -347,11 +399,12 @@ export default function UploadPage() {
             <div>
               <h2 className="text-base font-semibold text-white">{t('upload', 'classificationResults')}</h2>
               <p className="text-xs text-muted mt-0.5">{t('upload', 'itemsClassified', { count: results.length })}</p>
+              <p className="text-xs text-muted mt-2">{isRTL ? 'الرسوم المعروضة هي نسبة التعريفة المنشورة وليست مبلغ الرسوم المستحق. راجع مطابقة الصنف ومتطلبات الفسح.' : 'Duty fees show the published tariff rate, not the payable amount. Review the product match and clearance requirements.'}</p>
             </div>
             <div className="flex gap-2 flex-wrap">
               <span className="badge badge-success">
                 <CheckCircle2 className="w-3 h-3" />
-                {t('upload', 'classifiedCount', { count: results.filter((r) => r.classification?.hsCode && r.classification.hsCode !== 'ERROR').length })}
+                {t('upload', 'classifiedCount', { count: results.filter((r) => /^\d{8,12}$/.test(r.classification?.hsCode || '')).length })}
               </span>
               <span className="badge badge-error">
                 {t('upload', 'regulatedCount', { count: results.filter((r) => r.classification?.regulationStatus === 'REGULATED').length })}
@@ -367,9 +420,9 @@ export default function UploadPage() {
                   <tr>
                     <th>#</th>
                     <th>{t('upload', 'itemNameHeader')}</th>
-                    <th>{t('classification', 'hsCode')}</th>
-                    <th>{t('classification', 'cdf')}</th>
-                    <th>{t('upload', 'regulation')}</th>
+                    <th>{isRTL ? 'الرمز الجمركي' : 'HS CODES'}</th>
+                    <th>{isRTL ? 'الرسوم الجمركية' : 'CUSTOMS DUTY FEES'}</th>
+                    <th>{isRTL ? 'مقيد / غير مقيد' : 'REGULATED / NON-REGULATED'}</th>
                     <th>{t('upload', 'zatcaName')}</th>
                     <th>{t('classification', 'confidence')}</th>
                   </tr>
@@ -378,8 +431,15 @@ export default function UploadPage() {
                   {results.map((row) => (
                     <tr key={row.rowIndex}>
                       <td className="text-muted text-xs">{row.rowIndex + 1}</td>
-                      <td className="font-medium text-white max-w-[180px] truncate" title={row.itemName}>
+                      <td className="font-medium text-white min-w-56 max-w-sm" title={row.itemName}>
                         {row.itemName}
+                        {row.classification?.tariffEvidence && <details className="text-xs text-muted mt-2"><summary>{isRTL ? 'المصدر ومتطلبات الفسح' : 'Source and clearance requirements'}</summary>
+                          <p>{row.classification.tariffEvidence.note}</p>
+                          <p>{row.classification.tariffEvidence.importStatus}</p>
+                          <p>{row.classification.tariffEvidence.procedures.join(' • ')}</p>
+                          <p>{row.classification.tariffEvidence.retrievedAt}</p>
+                          <a className="underline" target="_blank" rel="noreferrer" href={row.classification.tariffEvidence.sourceUrl}>ZATCA</a>
+                        </details>}
                       </td>
                       <td>
                         <code className="text-brand-teal-light font-mono text-xs">
@@ -392,11 +452,12 @@ export default function UploadPage() {
                       <td>
                         <span className={`badge ${regulationColors[row.classification?.regulationStatus || 'UNKNOWN'] || 'badge-muted'} text-xs`}>
                           {row.classification?.regulationStatus === 'REGULATED'
-                            ? `⚠ ${t('classification', 'regulated')}`
+                            ? isRTL ? `⚠ ${t('classification', 'regulated')}` : 'REGULATED'
                             : row.classification?.regulationStatus === 'NON-REGULATED'
-                            ? `✓ ${t('upload', 'clear')}`
-                            : '?'}
+                            ? 'NON-REGULATED'
+                            : isRTL ? 'تتطلب المراجعة' : 'REVIEW REQUIRED'}
                         </span>
+                        {row.classification?.tariffEvidence?.importStatus && <p className="text-xs text-muted mt-2">{row.classification.tariffEvidence.importStatus}</p>}
                       </td>
                       <td className="text-muted text-xs max-w-[200px] truncate" title={row.classification?.standardizedZatcaName}>
                         {row.classification?.standardizedZatcaName || '—'}
@@ -447,7 +508,7 @@ export default function UploadPage() {
           <div>
             <p className="text-lg font-semibold text-white">{t('upload', 'exportSuccess')}</p>
             <p className="text-sm text-muted mt-1">
-              {t('upload', 'exportDescription')}
+              {results.length > 0 ? t('upload', 'exportDescription') : isRTL ? 'تم تنزيل ملف الأصناف المراجعة وتفاصيل الفاتورة. لم يتم تصنيف الأصناف بعد.' : 'Your reviewed items and invoice details have been downloaded. Items have not been classified yet.'}
             </p>
           </div>
           <div className="flex gap-3">

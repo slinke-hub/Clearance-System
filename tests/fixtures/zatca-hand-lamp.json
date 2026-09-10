@@ -1,0 +1,38 @@
+{
+  "HarmonizedCode": "851310000001",
+  "MainItemCode": "13",
+  "SubItemCode": "10",
+  "LocalItemCode": "00",
+  "AnalItemCode": "00",
+  "DescriptionArabic": "المصابيح اليدوية",
+  "DescriptionEnglish": "Hand lamps",
+  "RestrictionStatus": 1,
+  "ChapterCode": "85",
+  "ItemType": 3,
+  "TariffDetails": [
+    {
+      "HarmonizedCode": "851310000001",
+      "EffectDate": "2025-11-27T00:00:00",
+      "DutyRate": 10.0,
+      "DutyType": 1,
+      "MinimumDutyRate": 0.0,
+      "DutyRateCode": "2",
+      "MinimumDutyRateCode": "0",
+      "STACode": 0,
+      "MinimumDutyUnit": null,
+      "DutyUnit": null,
+      "InitialUnit": 7,
+      "ImportStatusID": "1",
+      "ImportStatusName": "مسموح استيراده وتصديره"
+    }
+  ],
+  "Procedures": [
+    {
+      "Code": 21,
+      "ReleaseNote": "يتطلب عند الاستيراد تقديم شهادة مطابقة من نظام سابر (الهيئة السعودية للمواصفات والمقاييس والجودة)",
+      "AuthorityCode": null,
+      "AuthoritySubCode": null,
+      "ProcedureType": 0
+    }
+  ]
+}

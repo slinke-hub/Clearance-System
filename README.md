@@ -64,7 +64,23 @@ NVIDIA_NIM_MODEL=moonshotai/kimi-k3
 
 ### 4. Database Setup
 
-Execute the SQL migration located in `supabase/migrations/001_initial_schema.sql` in your Supabase SQL editor.
+Apply the SQL files in `supabase/migrations` in order. Existing installations must apply `004_formatted_invoices.sql` before using formatted invoice imports. This adds invoice metadata, source rows, item codes, units, review timestamps, an atomic review-save function, and owner-scoped classification write policies.
+
+The upload workflow supports ordinary header-first tables and the commercial invoice layout with `Seq.`, `Cust_Item_No.`, `Description`, `Quantity`, `Unit Price`, and `Amount` headings. It preserves continuation descriptions, skips repeated page headings, and separates charges from products. Review every item, resolve reconciliation errors, then save/export or classify in batches of five. AI classification requires the configured NVIDIA endpoint; importing and exporting reviewed items does not.
+
+`npm test` runs parser and API workflow tests with a mocked classifier. To include a private invoice without copying it into the repository, set `INVOICE_SAMPLE` to its path before running the tests. The sample regression expects CN07-210: 89 lines, 4,865 PCS, 30 SETS, USD 32,113.40 goods and USD 42,136.40 total. Tests do not send the invoice to AI or the live database.
+
+Without a configured Supabase connection, invoice data is temporary and is lost when the server restarts. With Supabase configured, storage failures are reported instead of silently falling back to temporary storage. The live database migration and real AI responses need separate deployment verification.
+
+### Official tariff lookup
+
+Classification now searches the live ZATCA tariff service behind the supplied Integrated Customs Tariff Inquiry page. AI proposes an HS search prefix and matches the product to the returned official candidates; it does not supply duty rates or regulatory flags. Final codes must be 12 digits, matching ZATCA's integrated tariff guidance effective January 1, 2025. Source guidance: https://www.zatca.gov.sa/en/RulesRegulations/Taxes/Pages/Integrated-Tarrifs.aspx (checked September 9, 2026).
+
+The results and Excel export include `HS CODES`, `CUSTOMS DUTY FEES`, and `REGULATED / NON-REGULATED`. Duty is the published percentage, not a payable amount. Specific/minimum duties, ambiguous effective records, missing specifications, unavailable lookups, and uncertain matches require review. For this output, REGULATED means ZATCA reports a restriction, import prohibition, or required procedure; NON-REGULATED requires an allowed import status, an explicit zero restriction status, and an empty procedures list. Original import status and procedure text are retained, so a prohibition is not treated as an ordinary permit requirement.
+
+Each result saves the official record, source URL, retrieval time and effective date in the existing `raw_ai_response` field. Export includes a `Tariff Sources` worksheet. Historical AI-only results without official evidence show `REVIEW REQUIRED` in the three tariff columns and should be reclassified. No additional schema migration is needed beyond migration 004.
+
+The public portal's endpoint is not a versioned integration contract. Its public request header is read from the portal's published script and cached for one hour; tariff responses are fetched fresh. If the interface changes, the system reports review required rather than substituting estimated rates. Set `LIVE_ZATCA_TEST=1` to run the optional official HS-prefix lookup test. Fixtures and ordinary tests use public sample records or synthetic data, not live invoice submissions.
 
 ### 5. Run development server
 

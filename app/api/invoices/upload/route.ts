@@ -1,108 +1,42 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { createClient } from '@/lib/supabase/server';
 import { getCurrentUser } from '@/lib/auth/session';
+import { createClient } from '@/lib/supabase/server';
+import { isSupabaseConfigured } from '@/lib/supabase/config';
 import { parseExcelBuffer, autoDetectColumns } from '@/lib/excel/parser';
+import { mapItems } from '@/lib/excel/invoice';
+import { storedItems } from '@/lib/invoices';
 import { mockStore } from '@/lib/mock/store';
-
-export const maxDuration = 30;
 
 export async function POST(req: NextRequest) {
   try {
     const user = await getCurrentUser();
     if (!user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
-
-    const formData = await req.formData();
-    const file = formData.get('file') as File | null;
-
-    if (!file) return NextResponse.json({ error: 'No file provided' }, { status: 400 });
-
-    const allowedTypes = [
-      'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
-      'application/vnd.ms-excel',
-    ];
-    if (!allowedTypes.includes(file.type) && !file.name.match(/\.(xlsx|xls)$/i)) {
-      return NextResponse.json({ error: 'Only .xlsx and .xls files are supported' }, { status: 400 });
-    }
-
-    const buffer = await file.arrayBuffer();
-    const parsed = parseExcelBuffer(Buffer.from(buffer));
+    const file = (await req.formData()).get('file');
+    if (!(file instanceof File) || !/\.(xlsx|xls)$/i.test(file.name)) return NextResponse.json({ error: 'Choose an Excel invoice.' }, { status: 400 });
+    if (file.size > 10 * 1024 * 1024) return NextResponse.json({ error: 'Maximum file size is 10 MB.' }, { status: 413 });
+    let parsed;
+    try { parsed = parseExcelBuffer(Buffer.from(await file.arrayBuffer())); }
+    catch { return NextResponse.json({ error: 'Could not read the invoice. Check that the Excel file contains a supported table or commercial invoice.' }, { status: 422 }); }
+    if (parsed.rows.length > 2000) return NextResponse.json({ error: 'Maximum 2,000 product lines per invoice.' }, { status: 422 });
     const autoMapping = autoDetectColumns(parsed.headers);
-
     const runId = crypto.randomUUID();
-
-    // Line items structure
-    const lineItems = parsed.rows.map((row) => ({
-      id: crypto.randomUUID(),
-      run_id: runId,
-      row_index: row.rowIndex,
-      item_name: String(row.data[autoMapping.itemName ?? ''] ?? '').trim() || null,
-      item_description: String(row.data[autoMapping.itemDescription ?? ''] ?? '').trim() || null,
-      quantity: String(row.data[autoMapping.quantity ?? ''] ?? '').trim() || null,
-      unit_price: String(row.data[autoMapping.unitPrice ?? ''] ?? '').trim() || null,
-      total_price: String(row.data[autoMapping.totalPrice ?? ''] ?? '').trim() || null,
-      currency: String(row.data[autoMapping.currency ?? ''] ?? '').trim() || null,
-      raw_data: row.data as Record<string, unknown>,
-    }));
-
-    // Save to mockStore for resilient offline/dev access
-    mockStore.saveRun({
-      id: runId,
-      user_id: user.id,
-      file_name: file.name,
-      status: 'pending',
-      total_items: parsed.totalRows,
-      processed_items: 0,
-      column_mapping: autoMapping as Record<string, string>,
-      created_at: new Date().toISOString(),
-    });
-    mockStore.saveLineItems(runId, lineItems);
-
-    // Also persist to Supabase if connected
-    try {
-      const supabase = await createClient();
-      await supabase.from('invoice_runs').insert({
-        id: runId,
-        user_id: user.id,
-        file_name: file.name,
-        status: 'pending',
-        total_items: parsed.totalRows,
-        column_mapping: autoMapping,
-      });
-
-      if (lineItems.length > 0) {
-        await supabase.from('invoice_line_items').insert(lineItems);
-      }
-
-      await supabase.from('audit_logs').insert({
-        user_id: user.id,
-        action: 'invoice_uploaded',
-        entity_type: 'invoice_run',
-        entity_id: runId,
-        metadata: { file_name: file.name, total_rows: parsed.totalRows },
-      });
-    } catch {
-      // Supabase offline/mock mode — mockStore handled it
+    const items = mapItems(parsed.rows, autoMapping);
+    const run = { id: runId, user_id: user.id, file_name: file.name, status: 'pending' as const,
+      total_items: items.length, processed_items: 0, column_mapping: autoMapping as Record<string, string>,
+      created_at: new Date().toISOString(), invoice_metadata: parsed.metadata, source_rows: parsed.rows };
+    if (isSupabaseConfigured()) {
+      const db = await createClient();
+      const { error } = await db.from('invoice_runs').insert(run);
+      if (error) throw new Error('Could not save invoice. Verify the formatted invoice database migration is installed.');
+    } else {
+      mockStore.saveRun(run);
+      mockStore.saveLineItems(runId, storedItems(runId, items));
     }
-
-    return NextResponse.json({
-      runId,
-      fileName: file.name,
-      headers: parsed.headers,
-      totalRows: parsed.totalRows,
-      sheetName: parsed.sheetName,
-      autoMapping,
-      preview: parsed.rows.slice(0, 5).map((r) => r.data),
-      items: lineItems.map((item) => ({
-        rowIndex: item.row_index,
-        itemName: item.item_name || '',
-        itemDescription: item.item_description || '',
-      })),
-    });
-  } catch (err: unknown) {
-    console.error('Upload error:', err);
-    return NextResponse.json(
-      { error: err instanceof Error ? err.message : 'Upload failed' },
-      { status: 500 }
-    );
+    return NextResponse.json({ runId, fileName: file.name, headers: parsed.headers, totalRows: parsed.totalRows,
+      sheetName: parsed.sheetName, format: parsed.format, autoMapping, rows: parsed.rows,
+      metadata: parsed.metadata, items });
+  } catch (err) {
+    return NextResponse.json({ error: err instanceof Error ? err.message : 'Upload failed' }, { status: 500 });
   }
 }
+

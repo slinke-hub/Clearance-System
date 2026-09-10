@@ -1,4 +1,6 @@
 import type { ClassificationResult } from '@/types';
+import type { InvoiceMetadata } from '@/lib/excel/invoice';
+import type { ParsedExcelRow } from '@/types';
 
 type MockClassification = Partial<
   Pick<
@@ -9,6 +11,7 @@ type MockClassification = Partial<
     | 'standardized_name'
     | 'confidence_score'
     | 'classified_at'
+    | 'raw_ai_response'
   >
 >;
 
@@ -21,6 +24,9 @@ export interface MockRun {
   processed_items: number;
   column_mapping: Record<string, string>;
   created_at: string;
+  invoice_metadata?: InvoiceMetadata;
+  source_rows?: ParsedExcelRow[];
+  reviewed_at?: string | null;
 }
 
 export interface MockLineItem {
@@ -33,6 +39,10 @@ export interface MockLineItem {
   unit_price?: string | null;
   total_price?: string | null;
   currency?: string | null;
+  item_code?: string | null;
+  unit?: string | null;
+  contract?: string | null;
+  raw_data?: Record<string, unknown>;
   classification?: MockClassification;
 }
 
@@ -68,4 +78,5 @@ class MemoryStore {
   }
 }
 
-export const mockStore = new MemoryStore();
+const memory = globalThis as typeof globalThis & { clearanceMemoryStore?: MemoryStore };
+export const mockStore = memory.clearanceMemoryStore ??= new MemoryStore();
