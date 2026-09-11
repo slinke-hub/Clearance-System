@@ -103,6 +103,8 @@ export interface InvoiceRun {
 export interface ColumnMapping {
   itemName: string;
   itemDescription?: string;
+  itemCode?: string;
+  factoryCode?: string;
   quantity?: string;
   unitPrice?: string;
   totalPrice?: string;

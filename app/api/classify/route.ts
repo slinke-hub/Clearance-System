@@ -6,8 +6,12 @@ import { isSupabaseConfigured } from '@/lib/supabase/config';
 import { loadInvoice } from '@/lib/invoices';
 import { mockStore } from '@/lib/mock/store';
 import { classifyItemsBatch, isNvidiaNimConfigured } from '@/lib/ai/nvidia-nim-classifier';
+import { factoryCodeFor } from '@/lib/excel/item-fields';
+import { assertEvidenceSaved, classificationRecordFor, EvidenceStorageError } from '@/lib/zatca/evidence-storage';
+import { verifiedTariffFor } from '@/lib/zatca/tariff';
+import { repairLookupEvidence } from '@/lib/zatca/repair-evidence';
 
-export const maxDuration = 120;
+export const maxDuration = 300;
 const schema = z.object({ runId: z.string().uuid(),
   batchRows: z.array(z.number().int().nonnegative()).min(1).max(5),
 });
@@ -35,18 +39,23 @@ export async function POST(req: NextRequest) {
     const saved = invoice.items;
     const batch = batchRows.map(row => saved.find(i => i.row_index === row));
     if (batch.some(i => !i)) return NextResponse.json({ error: 'Review has changed. Restart classification.' }, { status: 409 });
-    const classifications = await classifyItemsBatch(batch.map(i => ({ rowIndex: i!.row_index, itemName: i!.item_name || '', itemDescription: [i!.item_description, i!.item_code].filter(Boolean).join(' | ') })), 5);
-    const records = classifications.map((c, index) => ({ line_item_id: batch[index]!.id, run_id: runId,
-      hs_code: c.hsCode, cdf: c.cdf, regulation_status: c.regulationStatus, standardized_name: c.standardizedZatcaName,
-      confidence_score: c.confidenceScore ?? null, classified_at: new Date().toISOString(),
-      raw_ai_response: { tariffEvidence: c.tariffEvidence },
-    }));
+    const invoiceContext = [...new Set(saved.map(i => i.item_name).filter((name): name is string => Boolean(name)))].slice(0, 15).map(name => name.slice(0, 180));
+    const sourceByRow = new Map(invoice.run.source_rows?.map(row => [row.rowIndex, row.data]));
+    const matched = await classifyItemsBatch(batch.map(i => ({ rowIndex: i!.row_index, itemName: i!.item_name || '', itemDescription: [i!.item_description, i!.item_code, factoryCodeFor(i!, sourceByRow.get(i!.row_index))].filter(Boolean).join(' | '), invoiceContext })), 4);
+    if (matched.length !== batch.length) throw new EvidenceStorageError('RESULT_COUNT_MISMATCH', 'The matching service did not return every invoice row. Please retry.');
+    const prepared = await Promise.all(matched.map(async (c, index) => classificationRecordFor(await repairLookupEvidence(c), batch[index]!.id, runId)));
+    const records = prepared.map(p => p.record);
     if (db) {
       const { error } = await db.from('classification_results').upsert(records, { onConflict: 'line_item_id' });
       if (error) throw new Error('Could not save classification results.');
     } else records.forEach((r, index) => mockStore.updateClassification(runId, batchRows[index], r));
     const refreshed = await loadInvoice(runId, user.id);
-    const processed = refreshed!.items.filter(i => /^\d{12}$/.test(i.classification?.hs_code || '') && i.classification?.cdf !== 'REVIEW REQUIRED' && i.classification?.regulation_status !== 'UNKNOWN').length;
+    for (const record of records) assertEvidenceSaved(record, refreshed?.items.find(i => i.id === record.line_item_id)?.classification);
+    const classifications = prepared.map(p => p.classification);
+    const processed = refreshed!.items.filter(i => {
+      const official = verifiedTariffFor(i.classification);
+      return official && official.cdf !== 'REVIEW REQUIRED' && official.regulationStatus !== 'UNKNOWN';
+    }).length;
     const lastBatch = batchRows.includes(saved[saved.length - 1].row_index);
     const status = processed === saved.length ? 'completed' : lastBatch ? 'failed' : 'processing';
     if (db) {
@@ -55,6 +64,7 @@ export async function POST(req: NextRequest) {
     } else { invoice.run.status = status; invoice.run.processed_items = processed; }
     return NextResponse.json({ classifications, rowIndexes: batchRows, status });
   } catch (err) {
+    if (err instanceof EvidenceStorageError) return NextResponse.json({ error: err.message, code: err.code }, { status: 503 });
     return NextResponse.json({ error: err instanceof Error ? err.message : 'Classification failed' }, { status: 500 });
   }
 }

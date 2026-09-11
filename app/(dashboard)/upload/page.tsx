@@ -1,12 +1,14 @@
 'use client';
 
 import React, { useState } from 'react';
+import Link from 'next/link';
 import { useDropzone } from 'react-dropzone';
 import { toast } from 'sonner';
 import { useI18n } from '@/lib/i18n/context';
 import type { ColumnMapping, ZatcaClassification } from '@/types';
 import type { ParsedExcelRow } from '@/types';
 import { mapItems, reviewInvoice, type InvoiceMetadata, type ReviewItem } from '@/lib/excel/invoice';
+import { classifyUploadedInvoice } from '@/lib/excel/classify-upload';
 import {
   Upload,
   FileSpreadsheet,
@@ -42,6 +44,8 @@ interface ClassificationRow {
   rowIndex: number;
   itemName: string;
   itemDescription: string;
+  itemCode: string;
+  factoryCode: string;
   classification: ZatcaClassification | null;
 }
 
@@ -62,7 +66,7 @@ export default function UploadPage() {
     payment: ['Payment terms', 'شروط الدفع'], originStatement: ['Origin statement', 'بيان المنشأ'],
     goodsTotal: ['Invoice goods total', 'قيمة البضاعة بالفاتورة'], invoiceTotal: ['Invoice total', 'إجمالي الفاتورة'],
     itemName: ['Description', 'الوصف'], itemDescription: ['References and details', 'المراجع والتفاصيل'],
-    itemCode: ['Item code', 'رمز الصنف'], unit: ['Unit', 'الوحدة'], quantity: ['Quantity', 'الكمية'],
+    itemCode: ['Item code', 'رمز الصنف'], factoryCode: ['Factory code', 'رمز المصنع'], unit: ['Unit', 'الوحدة'], quantity: ['Quantity', 'الكمية'],
     unitPrice: ['Unit price', 'سعر الوحدة'], totalPrice: ['Amount', 'المبلغ'], currency: ['Currency', 'العملة'],
   };
   const fieldLabel = (key: string) => fieldLabels[key]?.[isRTL ? 1 : 0] || key;
@@ -75,6 +79,7 @@ export default function UploadPage() {
   const [runId, setRunId] = useState<string | null>(null);
   const [edits, setEdits] = useState<Record<number, Partial<ReviewItem>>>({});
   const [isSaving, setIsSaving] = useState(false);
+  const [processingError, setProcessingError] = useState('');
   const reviewedItems = uploadResult ? mapItems(uploadResult.rows, mapping).map(i => ({ ...i, ...edits[i.rowIndex] })) : [];
   const invoiceReview = reviewInvoice(reviewedItems, uploadResult?.metadata || { charges: [] });
 
@@ -84,6 +89,7 @@ export default function UploadPage() {
     if (!file) return;
 
     setIsUploading(true);
+    setProcessingError('');
     try {
       const formData = new FormData();
       formData.append('file', file);
@@ -99,9 +105,11 @@ export default function UploadPage() {
       setMapping(data.autoMapping || {});
       setRunId(data.runId);
       toast.success(t('upload', 'parsedRows', { count: data.totalRows, file: data.fileName }));
-      setStep('map');
+      await processInvoice(data, data.autoMapping || {}, mapItems(data.rows, data.autoMapping || {}));
     } catch (err: unknown) {
-      toast.error(err instanceof Error ? err.message : t('upload', 'uploadFailed'));
+      const message = err instanceof Error ? err.message : t('upload', 'uploadFailed');
+      setProcessingError(message);
+      toast.error(message);
     } finally {
       setIsUploading(false);
     }
@@ -124,50 +132,42 @@ export default function UploadPage() {
     if (!response.ok) throw new Error(result.error || 'Could not save invoice');
   };
 
-  const handleClassify = async () => {
-    if (!runId || !uploadResult || !mapping.itemName) {
-      toast.error(t('upload', 'itemNameRequired'));
-      return;
-    }
-
+  const processInvoice = async (invoice: UploadResult, selectedMapping: Partial<ColumnMapping>, classifyItems: ReviewItem[]) => {
+    setProcessingError('');
     setClassifyProgress(0);
     setStep('classify');
 
     try {
-      if (invoiceReview.errors.length) throw new Error(invoiceReview.errors.join(' '));
-      await saveReview();
-      const classifyItems = reviewedItems;
-      const classifications: ZatcaClassification[] = [];
-      for (let offset = 0; offset < classifyItems.length; offset += 5) {
-        const res = await fetch('/api/classify', {
-          method: 'POST', headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ runId, batchRows: classifyItems.slice(offset, offset + 5).map(i => i.rowIndex) }),
-        });
-        const response = await res.json();
-        if (!res.ok) throw new Error(response.error || t('upload', 'classificationFailed'));
-        classifications.push(...response.classifications);
-        setClassifyProgress(Math.round(classifications.length / classifyItems.length * 100));
-      }
+      const classifications = await classifyUploadedInvoice(invoice, selectedMapping, classifyItems, setClassifyProgress);
       const data = { classifications };
 
       setClassifyProgress(100);
 
       // Build result rows
-      const rows: ClassificationRow[] = classifyItems.map((item: { rowIndex: number; itemName: string; itemDescription: string }, idx: number) => ({
+      const rows: ClassificationRow[] = classifyItems.map((item, idx: number) => ({
         rowIndex: item.rowIndex,
         itemName: item.itemName,
         itemDescription: item.itemDescription,
+        itemCode: item.itemCode,
+        factoryCode: item.factoryCode,
         classification: data.classifications[idx] ?? null,
       }));
 
       setResults(rows);
-      toast.success(t('upload', 'classifiedSuccess', { count: rows.length }));
+      const unresolved = rows.filter(row => row.classification?.regulationStatus === 'UNKNOWN' || row.classification?.cdf === 'REVIEW REQUIRED' || !/^\d{12}$/.test(row.classification?.hsCode || '')).length;
+      if (unresolved) toast.warning(isRTL ? `${unresolved} صنف يحتاج إلى مراجعة. افتح تفاصيل المصدر لمعرفة السبب.` : `${unresolved} items need review. Open their source details to see what is missing.`);
+      else toast.success(t('upload', 'classifiedSuccess', { count: rows.length }));
       setStep('review');
     } catch (err: unknown) {
-      toast.error(err instanceof Error ? err.message : t('upload', 'classificationFailed'));
+      const message = err instanceof Error ? err.message : t('upload', 'classificationFailed');
+      setProcessingError(message);
+      toast.error(message);
       setStep('map');
-    } finally {
     }
+  };
+
+  const handleClassify = async () => {
+    if (uploadResult) await processInvoice(uploadResult, mapping, reviewedItems);
   };
 
   // ── Export ─────────────────────────────────────────────────
@@ -190,7 +190,8 @@ export default function UploadPage() {
     } catch (err) { toast.error(err instanceof Error ? err.message : 'Export failed'); }
   };
 
-  const currentStepIndex = STEPS.findIndex((s) => s.id === step);
+  const visibleSteps = STEPS.filter(s => s.id !== 'map' || step === 'map');
+  const currentStepIndex = visibleSteps.findIndex((s) => s.id === step);
 
   const regulationColors: Record<string, string> = {
     'REGULATED': 'badge-error',
@@ -202,13 +203,13 @@ export default function UploadPage() {
     <div className="max-w-4xl space-y-6">
       <div>
         <h1 className="text-2xl font-bold text-white">{t('upload', 'title')}</h1>
-        <p className="text-muted text-sm mt-1">{t('upload', 'subtitle')}</p>
+        <p className="text-muted text-sm mt-1">{isRTL ? 'ارفع فاتورة Excel لقراءة الأصناف وتصنيفها تلقائياً بالذكاء الاصطناعي باستخدام بيانات تعريفة زاتكا.' : 'Upload an Excel invoice. AI reads the extracted product details and matches them to current ZATCA tariff records automatically.'}</p>
       </div>
 
       {/* Step Indicator */}
       <div className="glass-card p-4">
         <div className="flex items-center gap-2 overflow-x-auto">
-          {STEPS.map((s, idx) => {
+          {visibleSteps.map((s, idx) => {
             const isActive = s.id === step;
             const isComplete = idx < currentStepIndex && (results.length > 0 || (s.id !== 'classify' && s.id !== 'review'));
             return (
@@ -228,7 +229,7 @@ export default function UploadPage() {
                   </div>
                   <span className="text-xs font-medium whitespace-nowrap">{t('upload', s.labelKey)}</span>
                 </div>
-                {idx < STEPS.length - 1 && (
+                {idx < visibleSteps.length - 1 && (
                   <ChevronRight className={`w-3.5 h-3.5 text-surface-border shrink-0 ${isRTL ? 'rotate-180' : ''}`} />
                 )}
               </React.Fragment>
@@ -241,6 +242,7 @@ export default function UploadPage() {
       {step === 'upload' && (
         <div className="glass-card p-6">
           <h2 className="text-base font-semibold text-white mb-4">{t('upload', 'step1')}</h2>
+          {processingError && <p role="alert" className="text-warning rounded-xl bg-warning/10 p-3 mb-4">{processingError}</p>}
           <div {...getRootProps()} className={`dropzone ${isDragActive ? 'active' : ''}`}>
             <input {...getInputProps({ 'aria-label': t('upload', 'fileUpload') })} id="file-dropzone" />
             {isUploading ? (
@@ -261,12 +263,14 @@ export default function UploadPage() {
               </>
             )}
           </div>
+          <p className="text-sm text-muted mt-4">{isRTL ? 'النتائج: الرمز الجمركي · الرسوم الجمركية · مقيد / غير مقيد. تظهر الأصناف غير المؤكدة للمراجعة.' : 'Results: HS CODES · CUSTOMS DUTY FEES · REGULATED / NON-REGULATED. Uncertain items are flagged for review.'}</p>
         </div>
       )}
 
       {/* ── Step: Map Columns ────────────────────────────── */}
       {step === 'map' && uploadResult && (
         <div className="glass-card p-6 space-y-5">
+          {processingError && <p role="alert" className="text-warning rounded-xl bg-warning/10 p-3">{processingError}</p>}
           <div className="flex items-center justify-between">
             <div>
               <h2 className="text-base font-semibold text-white">{isRTL ? 'مراجعة الفاتورة والأصناف' : 'Review invoice and items'}</h2>
@@ -292,6 +296,8 @@ export default function UploadPage() {
             {[
               { field: 'itemName', label: t('upload', 'itemName'), required: true },
               { field: 'itemDescription', label: t('upload', 'itemDescription'), required: false },
+              { field: 'itemCode', label: fieldLabel('itemCode'), required: false },
+              { field: 'factoryCode', label: fieldLabel('factoryCode'), required: false },
               { field: 'quantity', label: t('upload', 'quantity'), required: false },
               { field: 'unitPrice', label: t('upload', 'unitPrice'), required: false },
               { field: 'totalPrice', label: t('upload', 'totalPrice'), required: false },
@@ -331,8 +337,8 @@ export default function UploadPage() {
             {[...invoiceReview.errors, ...invoiceReview.warnings].map((message, index) => <p key={index} role="status" className="text-warning">{message}</p>)}
             <p className="text-muted">{isRTL ? 'راجع جميع الأصناف وعدّل البيانات قبل التصنيف.' : 'Review all items and correct any details before classification. Row numbers refer to the original Excel sheet.'}</p>
             <div className="overflow-auto max-h-[480px]">
-              <table className="data-table"><thead><tr><th>{isRTL ? 'الصف' : 'Row'}</th>{(['itemName', 'itemDescription', 'itemCode', 'unit', 'quantity', 'unitPrice', 'totalPrice', 'currency'] as const).map(key => <th key={key}>{fieldLabel(key)}</th>)}</tr></thead>
-                <tbody>{reviewedItems.map(item => <tr key={item.rowIndex}><td>{item.rowIndex + 1}</td>{(['itemName', 'itemDescription', 'itemCode', 'unit', 'quantity', 'unitPrice', 'totalPrice', 'currency'] as const).map(key => <td key={key}><input className={`form-input ${key === 'itemName' || key === 'itemDescription' ? 'min-w-72' : 'min-w-32'}`} aria-label={`${fieldLabel(key)} row ${item.rowIndex + 1}`} value={item[key]} onChange={event => setEdits(prev => ({ ...prev, [item.rowIndex]: { ...prev[item.rowIndex], [key]: event.target.value } }))} /></td>)}</tr>)}</tbody>
+              <table className="data-table"><thead><tr><th>{isRTL ? 'الصف' : 'Row'}</th>{(['itemName', 'itemDescription', 'itemCode', 'factoryCode', 'unit', 'quantity', 'unitPrice', 'totalPrice', 'currency'] as const).map(key => <th key={key}>{fieldLabel(key)}</th>)}</tr></thead>
+                <tbody>{reviewedItems.map(item => <tr key={item.rowIndex}><td>{item.rowIndex + 1}</td>{(['itemName', 'itemDescription', 'itemCode', 'factoryCode', 'unit', 'quantity', 'unitPrice', 'totalPrice', 'currency'] as const).map(key => <td key={key}><input className={`form-input ${key === 'itemName' || key === 'itemDescription' ? 'min-w-72' : 'min-w-32'}`} aria-label={`${fieldLabel(key)} row ${item.rowIndex + 1}`} value={item[key]} onChange={event => setEdits(prev => ({ ...prev, [item.rowIndex]: { ...prev[item.rowIndex], [key]: event.target.value } }))} /></td>)}</tr>)}</tbody>
               </table>
             </div>
           </div>
@@ -395,6 +401,10 @@ export default function UploadPage() {
       {/* ── Step: Review ──────────────────────────────────── */}
       {step === 'review' && results.length > 0 && (
         <div className="space-y-4">
+          <div className="glass-card p-4 flex flex-wrap items-center justify-between gap-3">
+            <p className="text-sm text-muted">{isRTL ? 'تم حفظ نتائج الفاتورة. افتح الرابط لعرض تفاصيل زاتكا لكل صنف.' : 'Invoice results saved. Open the result link for each item’s ZATCA details.'}</p>
+            <Link href={`/invoices/${runId}`} className="btn-primary">{isRTL ? 'فتح رابط النتيجة' : 'Open result link'}</Link>
+          </div>
           <div className="glass-card p-5 flex items-center justify-between flex-wrap gap-3">
             <div>
               <h2 className="text-base font-semibold text-white">{t('upload', 'classificationResults')}</h2>
@@ -419,7 +429,9 @@ export default function UploadPage() {
                 <thead>
                   <tr>
                     <th>#</th>
-                    <th>{t('upload', 'itemNameHeader')}</th>
+                    <th>{isRTL ? 'رمز الصنف' : 'ITEM CODE'}</th>
+                    <th>{isRTL ? 'رمز المصنع' : 'FACTORY CODE'}</th>
+                    <th>{isRTL ? 'وصف الصنف' : 'ITEM DESCRIPTION'}</th>
                     <th>{isRTL ? 'الرمز الجمركي' : 'HS CODES'}</th>
                     <th>{isRTL ? 'الرسوم الجمركية' : 'CUSTOMS DUTY FEES'}</th>
                     <th>{isRTL ? 'مقيد / غير مقيد' : 'REGULATED / NON-REGULATED'}</th>
@@ -431,13 +443,19 @@ export default function UploadPage() {
                   {results.map((row) => (
                     <tr key={row.rowIndex}>
                       <td className="text-muted text-xs">{row.rowIndex + 1}</td>
+                      <td className="text-xs whitespace-nowrap" dir="ltr">{row.itemCode || (isRTL ? 'غير مذكور' : 'Not provided')}</td>
+                      <td className="text-xs whitespace-nowrap" dir="ltr">{row.factoryCode || (isRTL ? 'غير مذكور' : 'Not provided')}</td>
                       <td className="font-medium text-white min-w-56 max-w-sm" title={row.itemName}>
                         {row.itemName}
+                        {row.itemDescription && row.itemDescription !== row.itemName && <p className="text-xs text-muted mt-1">{row.itemDescription}</p>}
+                        <Link href={`/invoices/${runId}?item=${row.rowIndex}`} className="block text-xs text-brand-teal-light underline mt-2">{isRTL ? 'عرض نتيجة زاتكا' : 'View ZATCA result'}</Link>
+                        {row.classification?.hsCode === 'REVIEW REQUIRED' && <p role="status" className="text-xs text-warning mt-2">{row.classification.tariffEvidence?.note}</p>}
                         {row.classification?.tariffEvidence && <details className="text-xs text-muted mt-2"><summary>{isRTL ? 'المصدر ومتطلبات الفسح' : 'Source and clearance requirements'}</summary>
                           <p>{row.classification.tariffEvidence.note}</p>
                           <p>{row.classification.tariffEvidence.importStatus}</p>
                           <p>{row.classification.tariffEvidence.procedures.join(' • ')}</p>
                           <p>{row.classification.tariffEvidence.retrievedAt}</p>
+                          {row.classification.tariffEvidence.productEvidence?.map(source => <p key={source.reference}><a className="underline" target="_blank" rel="noreferrer" href={source.sourceUrl}>{isRTL ? 'مرجع الشركة المصنعة' : 'Manufacturer reference'}: {source.reference}</a> — {source.description}</p>)}
                           <a className="underline" target="_blank" rel="noreferrer" href={row.classification.tariffEvidence.sourceUrl}>ZATCA</a>
                         </details>}
                       </td>
@@ -488,6 +506,9 @@ export default function UploadPage() {
             <button onClick={() => { setStep('upload'); setResults([]); setRunId(null); setUploadResult(null); }} className="btn-ghost">
               <RefreshCw className="w-4 h-4" /> {t('upload', 'startOver')}
             </button>
+            <button onClick={() => { setProcessingError(''); setStep('map'); }} className="btn-ghost">
+              {isRTL ? 'تعديل التفاصيل وإعادة التصنيف' : 'Edit details and reclassify'}
+            </button>
             <button
               id="export-excel-btn"
               onClick={handleExport}
@@ -518,6 +539,7 @@ export default function UploadPage() {
             <button onClick={handleExport} className="btn-primary">
               <Download className="w-4 h-4" /> {t('upload', 'downloadAgain')}
             </button>
+            {runId && results.length > 0 && <Link href={`/invoices/${runId}`} className="btn-ghost">{isRTL ? 'فتح رابط النتيجة' : 'Open result link'}</Link>}
           </div>
         </div>
       )}

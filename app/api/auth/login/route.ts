@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { ADMIN_CREDENTIALS } from '@/lib/auth/session';
 import { createClient } from '@/lib/supabase/server';
+import { isSupabaseConfigured } from '@/lib/supabase/config';
 
 export async function POST(req: NextRequest) {
   try {
@@ -12,8 +13,9 @@ export async function POST(req: NextRequest) {
 
     const normalizedEmail = String(email).trim().toLowerCase();
 
-    // 1. Check if matches designated Admin credentials
+    // Local demo sign-in is only available when there is no database connection.
     if (
+      !isSupabaseConfigured() &&
       normalizedEmail === ADMIN_CREDENTIALS.email.toLowerCase() &&
       password === ADMIN_CREDENTIALS.password
     ) {
@@ -43,12 +45,6 @@ export async function POST(req: NextRequest) {
         maxAge: 60 * 60 * 24 * 30, // 30 days
       });
 
-      // Also attempt Supabase sign-in if connected
-      try {
-        const supabase = await createClient();
-        await supabase.auth.signInWithPassword({ email: normalizedEmail, password });
-      } catch {}
-
       return response;
     }
 
@@ -64,7 +60,10 @@ export async function POST(req: NextRequest) {
         return NextResponse.json({ error: error.message }, { status: 401 });
       }
 
-      return NextResponse.json({ success: true, user: data.user });
+      const response = NextResponse.json({ success: true, user: data.user });
+      response.cookies.delete('clearance_admin_session');
+      response.cookies.delete('clearance_client_session');
+      return response;
     } catch {
       return NextResponse.json({ error: 'Invalid email or password' }, { status: 401 });
     }

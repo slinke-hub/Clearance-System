@@ -8,9 +8,10 @@ const ts = require('typescript');
 const root = path.resolve(__dirname, '..');
 let subscription;
 let aiCalls = 0;
+let savedClassification;
 const db = { from(table) {
   if (table === 'subscriptions') return { select: () => ({ eq: () => ({ maybeSingle: async () => subscription }) }) };
-  if (table === 'classification_results') return { upsert: async () => ({ error: null }) };
+  if (table === 'classification_results') return { upsert: async records => { savedClassification = JSON.parse(JSON.stringify(records[0])); return { error: null }; } };
   if (table === 'invoice_runs') return { update: () => ({ eq: () => ({ eq: async () => ({ error: null }) }) }) };
   throw new Error(`Unexpected table ${table}`);
 } };
@@ -19,7 +20,7 @@ Module._load = function(name, parent, main) {
   if (name === '@/lib/auth/session') return { getCurrentUser: async () => ({ id: 'owner', role: 'user', plan: 'free' }) };
   if (name === '@/lib/supabase/config') return { isSupabaseConfigured: () => true };
   if (name === '@/lib/supabase/server') return { createClient: async () => db };
-  if (name === '@/lib/invoices') return { loadInvoice: async () => ({ run: { reviewed_at: '2026-09-09' }, items: [{ id: 'line', row_index: 1, item_name: 'Lamp' }] }) };
+  if (name === '@/lib/invoices') return { loadInvoice: async () => ({ run: { reviewed_at: '2026-09-09' }, items: [{ id: 'line', row_index: 1, item_name: 'Lamp', classification:savedClassification }] }) };
   if (name === '@/lib/ai/nvidia-nim-classifier') return {
     isNvidiaNimConfigured: () => true,
     classifyItemsBatch: async () => { aiCalls++; return [{ hsCode: 'REVIEW REQUIRED', cdf: 'REVIEW REQUIRED', regulationStatus: 'UNKNOWN' }]; },

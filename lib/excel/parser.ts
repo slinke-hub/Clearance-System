@@ -70,6 +70,8 @@ function parseCommercialInvoice(grid: (string | number | null)[][], sheetName: s
   const col = (name: string) => header.indexOf(name);
   const seq = col('Seq.'), code = col('Cust_Item_No.'), desc = col('Description');
   const qty = col('Quantity'), price = col('Unit Price'), amount = col('Amount');
+  const factoryHeader = autoDetectColumns(header).factoryCode;
+  const factory = factoryHeader ? col(factoryHeader) : -1;
   if ([seq, code, desc, qty, price, amount].some(c => c < 0)) throw new Error('Invoice headings are incomplete.');
   const metadata: InvoiceMetadata = { charges: [] };
   const cells = grid.flat().filter(v => v !== null).map(String);
@@ -105,6 +107,7 @@ function parseCommercialInvoice(grid: (string | number | null)[][], sheetName: s
     if (/^\d+$/.test(String(row[seq] ?? '').trim()) && row[code] && row[desc]) {
       current = { rowIndex: index, data: {
         'Item Name': String(row[desc]), 'Item Description': '', 'Item Code': String(row[code]),
+        'Factory Code': factory >= 0 ? String(row[factory] ?? '') : '',
         Quantity: row[qty], Unit: row[qty + 1], 'Unit Price': row[price], 'Total Price': row[amount],
         Currency: metadata.currency ?? '', Contract: contract,
       } };
@@ -121,17 +124,24 @@ function parseCommercialInvoice(grid: (string | number | null)[][], sheetName: s
  * Auto-detect column mapping based on common header patterns.
  */
 export function autoDetectColumns(headers: string[]): Partial<ColumnMapping> {
-  const normalized = headers.map((h) => ({ original: h, lower: h.toLowerCase().trim() }));
-
-  const find = (patterns: string[]) =>
-    normalized.find(({ lower }) => patterns.some((p) => lower.includes(p)))?.original;
+  const normalized = headers.map(original => ({ original, lower: original.toLowerCase().replace(/[_./()#-]+/g, ' ').replace(/\s+/g, ' ').trim() }));
+  // Prefer explicit labels regardless of column order; "Item Code" is never a description.
+  const find = (patterns: string[], allowSuffix = false) => {
+    for (const pattern of patterns) {
+      const exact = normalized.find(h => h.lower === pattern);
+      if (exact) return exact.original;
+    }
+    return allowSuffix ? normalized.find(h => patterns.some(p => h.lower.startsWith(p + ' ')))?.original : undefined;
+  };
 
   return {
-    itemName: find(['item name', 'item', 'product name', 'description', 'goods', 'commodity', 'item description', 'product']),
-    itemDescription: find(['description', 'details', 'spec', 'notes', 'remarks']),
+    itemName: find(['item name', 'product name', 'item description', 'product description', 'goods description', 'description', 'goods', 'commodity', 'product', 'item', 'وصف الصنف', 'اسم الصنف', 'الوصف']),
+    itemDescription: find(['item description', 'product description', 'description', 'details', 'specifications', 'spec', 'notes', 'remarks', 'الوصف']),
+    itemCode: find(['item code', 'cust item no', 'customer item no', 'customer item number', 'customer code', 'item no', 'item number', 'product code', 'sku', 'رمز الصنف']),
+    factoryCode: find(['factory code', 'factory item code', 'factory no', 'factory part no', 'factory part number', 'manufacturer code', 'manufacturer part number', 'manufacturer part no', 'mfr part no', 'mpn', 'oem code', 'oem part number', 'رمز المصنع']),
     quantity: find(['qty', 'quantity', 'units', 'count', 'pcs', 'pieces']),
-    unitPrice: find(['unit price', 'unit cost', 'price/unit', 'rate', 'price per']),
-    totalPrice: find(['total', 'amount', 'total price', 'total cost', 'subtotal', 'line total']),
+    unitPrice: find(['unit price', 'unit cost', 'price unit', 'rate', 'price per'], true),
+    totalPrice: find(['total price', 'total cost', 'line total', 'amount', 'subtotal', 'total'], true),
     currency: find(['currency', 'curr', 'ccy']),
   };
 }

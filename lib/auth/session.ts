@@ -30,7 +30,8 @@ export async function getCurrentUser(): Promise<AppUser | null> {
   const cookieStore = await cookies();
   const adminCookie = cookieStore.get('clearance_admin_session')?.value;
 
-  if (adminCookie) {
+  // Local demo identities must never override the authenticated database owner.
+  if (adminCookie && !isSupabaseConfigured()) {
     try {
       const parsed = JSON.parse(adminCookie);
       if (parsed.email?.toLowerCase() === ADMIN_CREDENTIALS.email.toLowerCase()) {

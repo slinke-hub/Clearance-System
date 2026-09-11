@@ -6,8 +6,9 @@ export async function proxy(request: NextRequest) {
   let supabaseResponse = NextResponse.next({ request });
   let isAuthenticated = false;
 
+  const supabaseConfigured = isSupabaseConfigured();
   const adminCookie = request.cookies.get('clearance_admin_session')?.value;
-  if (adminCookie) {
+  if (adminCookie && !supabaseConfigured) {
     try {
       const parsed = JSON.parse(adminCookie);
       isAuthenticated =
@@ -15,8 +16,6 @@ export async function proxy(request: NextRequest) {
         parsed.email.toLowerCase() === 'privatepple@gmail.com';
     } catch {}
   }
-
-  const supabaseConfigured = isSupabaseConfigured();
 
   // Local client sessions are only valid in development without Supabase.
   if (!isAuthenticated && !supabaseConfigured && process.env.NODE_ENV !== 'production') {

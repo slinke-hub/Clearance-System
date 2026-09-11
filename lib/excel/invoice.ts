@@ -23,6 +23,7 @@ export interface ReviewItem {
   itemName: string;
   itemDescription: string;
   itemCode: string;
+  factoryCode: string;
   unit: string;
   contract: string;
   quantity: string;
@@ -46,8 +47,9 @@ export function mapItems(rows: ParsedExcelRow[], mapping: Partial<ColumnMapping>
     itemName: get(row, mapping.itemName), itemDescription: get(row, mapping.itemDescription),
     quantity: get(row, mapping.quantity), unitPrice: get(row, mapping.unitPrice),
     totalPrice: get(row, mapping.totalPrice), currency: normalizeCurrency(get(row, mapping.currency)),
-    itemCode: get(row, 'Item Code'), unit: get(row, 'Unit'), contract: get(row, 'Contract'),
-  })).filter(item => item.itemName);
+    itemCode: get(row, mapping.itemCode ?? 'Item Code'), factoryCode: get(row, mapping.factoryCode ?? 'Factory Code'),
+    unit: get(row, 'Unit'), contract: get(row, 'Contract'),
+  })).filter(item => item.itemName || item.itemCode || item.factoryCode);
 }
 
 export function reviewInvoice(items: ReviewItem[], metadata: InvoiceMetadata) {
