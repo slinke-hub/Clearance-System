@@ -32,10 +32,30 @@ export function parseExcelBuffer(buffer: Buffer | ArrayBuffer): ParseResult {
     return parseCommercialInvoice(grid, sheetName, headerRow);
   }
 
+  const headerKeywords = ['description', 'item', 'product', 'qty', 'quantity', 'price', 'amount', 'وصف', 'صنف'];
+  let tableHeaderRow = 0;
+  let maxScore = 0;
+
+  for (let i = 0; i < Math.min(grid.length, 20); i++) {
+    const row = grid[i] || [];
+    let score = 0;
+    for (const cell of row) {
+      if (typeof cell === 'string') {
+        const lower = cell.toLowerCase().trim();
+        if (headerKeywords.some(kw => lower.includes(kw))) score++;
+      }
+    }
+    if (score > maxScore) {
+      maxScore = score;
+      tableHeaderRow = i;
+    }
+  }
+
   // Convert to array of objects
   const rawData = XLSX.utils.sheet_to_json<Record<string, unknown>>(sheet, {
     defval: null,
     raw: false,
+    range: tableHeaderRow,
   });
 
   if (rawData.length === 0) {
