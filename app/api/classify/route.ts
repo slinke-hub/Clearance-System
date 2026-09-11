@@ -41,7 +41,16 @@ export async function POST(req: NextRequest) {
     if (batch.some(i => !i)) return NextResponse.json({ error: 'Review has changed. Restart classification.' }, { status: 409 });
     const invoiceContext = [...new Set(saved.map(i => i.item_name).filter((name): name is string => Boolean(name)))].slice(0, 15).map(name => name.slice(0, 180));
     const sourceByRow = new Map(invoice.run.source_rows?.map(row => [row.rowIndex, row.data]));
-    const matched = await classifyItemsBatch(batch.map(i => ({ rowIndex: i!.row_index, itemName: i!.item_name || '', itemDescription: [i!.item_description, i!.item_code, factoryCodeFor(i!, sourceByRow.get(i!.row_index))].filter(Boolean).join(' | '), invoiceContext })), 4);
+    const matched = await classifyItemsBatch(batch.map(i => {
+      const name = i!.item_description || i!.item_name || '';
+      const secondary = (i!.item_description && i!.item_name && i!.item_description !== i!.item_name) ? i!.item_name : '';
+      return {
+        rowIndex: i!.row_index,
+        itemName: name,
+        itemDescription: [secondary, i!.item_code, factoryCodeFor(i!, sourceByRow.get(i!.row_index))].filter(Boolean).join(' | '),
+        invoiceContext
+      };
+    }), 4);
     if (matched.length !== batch.length) throw new EvidenceStorageError('RESULT_COUNT_MISMATCH', 'The matching service did not return every invoice row. Please retry.');
     const prepared = await Promise.all(matched.map(async (c, index) => classificationRecordFor(await repairLookupEvidence(c), batch[index]!.id, runId)));
     const records = prepared.map(p => p.record);
