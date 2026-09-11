@@ -70,10 +70,17 @@ export function InvoiceResults({ report, initialItem }: { report: InvoiceReport;
             <p className="text-sm text-slate-600 mt-4" role="status">{item.note}</p>
             {item.productEvidence.map(source => <p key={source.reference} className="text-sm text-slate-600 mt-3" dir="auto"><a href={source.sourceUrl} target="_blank" rel="noreferrer" className="text-emerald-700 underline">{label('Manufacturer reference', 'مرجع الشركة المصنعة')}: {source.reference}</a> — {source.description}</p>)}
             {item.retrievedAt && <p className="text-xs text-slate-500 mt-2">{label('Checked', 'تاريخ التحقق')}: <span dir="ltr">{item.retrievedAt.replace('T', ' ').replace('Z', ' UTC')}</span> · {label('Effective date', 'تاريخ السريان')}: <span dir="ltr">{item.effectiveDate.slice(0, 10)}</span></p>}
-            <div className="mt-5 flex flex-wrap justify-between gap-3 text-sm">
-              <a href={item.sourceUrl} target="_blank" rel="noreferrer" className="text-emerald-700 underline inline-flex items-center gap-1">{label('Open ZATCA tariff search', 'فتح بحث التعريفة لدى زاتكا')}<ExternalLink className="h-4 w-4" /></a>
-              <button className="text-emerald-700 underline" onClick={() => copy(`${window.location.origin}${path}?item=${item.rowIndex}`)}>{label('Copy this item’s result link', 'نسخ رابط نتيجة الصنف')}</button>
-              <Dialog.Close className="rounded bg-slate-100 px-5 py-2 text-slate-900">{label('Close', 'إغلاق')}</Dialog.Close>
+            <div className="mt-5 flex flex-wrap justify-between gap-4 text-sm border-t border-slate-200 pt-4">
+              <div className="flex flex-col gap-2">
+                <span className="font-semibold text-slate-700">{label('Reference Links', 'روابط مرجعية')}:</span>
+                <a href={item.sourceUrl} target="_blank" rel="noreferrer" className="text-emerald-700 underline inline-flex items-center gap-1">{label('Open ZATCA tariff search', 'فتح بحث التعريفة لدى زاتكا')}<ExternalLink className="h-4 w-4" /></a>
+                <a href="https://saber.sa/home/hscodes" target="_blank" rel="noreferrer" className="text-emerald-700 underline inline-flex items-center gap-1">{label('Search Saber HS Codes', 'البحث عن رمز النظام المنسق في سابر')}<ExternalLink className="h-4 w-4" /></a>
+                <a href="https://tabseer.co" target="_blank" rel="noreferrer" className="text-emerald-700 underline inline-flex items-center gap-1">{label('Tabseer Conformity', 'مطابقة تبصير')}<ExternalLink className="h-4 w-4" /></a>
+              </div>
+              <div className="flex flex-col gap-3 items-end justify-end">
+                <button className="text-emerald-700 underline" onClick={() => copy(`${window.location.origin}${path}?item=${item.rowIndex}`)}>{label('Copy this item’s result link', 'نسخ رابط نتيجة الصنف')}</button>
+                <Dialog.Close className="rounded bg-slate-100 px-5 py-2 text-slate-900 w-full text-center hover:bg-slate-200">{label('Close', 'إغلاق')}</Dialog.Close>
+              </div>
             </div>
           </>}
         </Dialog.Content>
