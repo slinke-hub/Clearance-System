@@ -20,8 +20,8 @@ export async function classifyUploadedInvoice(
   if (!saved.ok) throw new Error(savedBody.error || 'Could not save invoice items.');
   const classifications: ZatcaClassification[] = [];
   // Research takes several source requests; keep each HTTP batch within one worker wave.
-  for (let offset = 0; offset < items.length; offset += 4) {
-    const batchRows = items.slice(offset, offset + 4).map(i => i.rowIndex);
+  for (let offset = 0; offset < items.length; offset += 24) {
+    const batchRows = items.slice(offset, offset + 24).map(i => i.rowIndex);
     const response = await request('/api/classify', {
       method: 'POST', headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ runId: invoice.runId, batchRows }),

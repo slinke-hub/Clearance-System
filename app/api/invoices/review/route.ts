@@ -24,7 +24,7 @@ export async function POST(req: NextRequest) {
     if (isSupabaseConfigured()) {
       const db = await createClient();
       const { error } = await db.rpc('save_invoice_review', { target_run: runId, reviewed_items: saved, mapping });
-      if (error) throw new Error('Could not save reviewed items. Check the invoice database migration.');
+      if (error) throw new Error(`Could not save reviewed items. DB Error: ${error.message} - ${error.details || ''} - ${error.hint || ''}`);
     } else {
       mockStore.saveLineItems(runId, saved);
       invoice.run.column_mapping = mapping;
